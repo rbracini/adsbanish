@@ -1,12 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Adaptive icon foreground
+  Adaptive icon foreground — exactly matches ADS Banish Icon.html spec.
   Viewport 108×108dp. Background = black (ic_launcher_background.xml).
-  Shield: 36×42dp centered at (54,54) — x:36..72, y:33..75.
-    Smaller shield leaves black visible around it, matching app screen aesthetic.
-  Brackets: corners at (28,28)/(80,28)/(28,80)/(80,80), arm 12dp.
-    Corner distance from center = 36.8dp — safely inside Samsung squircle (safe up to ~31dp at 45°).
-  Checkmark: green, visible against black inside the shield outline.
+  Shield and checkmark scaled from SVG spec (icon 300×300, scale=0.36).
+  No brackets — clean design per spec.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -14,28 +11,18 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Corner brackets — arm 12dp, stroke 3.5dp, corners at 28..80 -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#00FF66"
-        android:strokeWidth="3.5"
-        android:pathData="M28,40 L28,28 L40,28
-                          M68,28 L80,28 L80,40
-                          M28,68 L28,80 L40,80
-                          M68,80 L80,80 L80,68"/>
-
-    <!-- Shield solid green — 36×42dp, leaves black background visible at corners -->
+    <!-- Shield solid green — from spec: M600,300 L708,342 L708,438 Q708,516 600,558 Q492,516 492,438 L492,342 Z -->
     <path
         android:fillColor="#00FF66"
-        android:pathData="M54,33 L72,39 L72,57 Q72,69 54,75 Q36,69 36,57 L36,39 Z"/>
+        android:pathData="M54,18 L93,33 L93,68 Q93,96 54,111 Q15,96 15,68 L15,33 Z"/>
 
-    <!-- Checkmark black — on green shield -->
+    <!-- Checkmark black — from spec: M551,426 L590,465 L662,393, stroke-width=18 -->
     <path
         android:fillColor="#00000000"
         android:strokeColor="#000000"
-        android:strokeWidth="4.5"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M44,57 L51,64 L66,48"/>
+        android:strokeWidth="6.5"
+        android:strokeLineCap="square"
+        android:strokeLineJoin="miter"
+        android:pathData="M36,63 L50,77 L76,52"/>
 
 </vector>

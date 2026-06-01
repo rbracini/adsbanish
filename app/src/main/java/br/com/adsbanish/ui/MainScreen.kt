@@ -376,7 +376,7 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
 
             // Top-left: STATUS:OK + blinking cursor (active) / STATUS:-- (inactive)
             Row(
-                modifier          = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 10.dp),
+                modifier          = Modifier.align(Alignment.TopStart).padding(start = 10.dp, top = 7.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -403,7 +403,7 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
                 fontWeight = FontWeight.Normal,
                 fontSize   = 7.sp,
                 color      = TxtDim,
-                modifier   = Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 10.dp)
+                modifier   = Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 7.dp)
             )
         }
     }
