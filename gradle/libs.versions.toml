@@ -5,6 +5,7 @@ compose-bom = "2024.09.00"
 activity-compose = "1.9.2"
 core-ktx = "1.13.1"
 lifecycle = "2.8.5"
+junit = "4.13.2"
 
 [libraries]
 compose-bom                  = { group = "androidx.compose",           name = "compose-bom",                    version.ref = "compose-bom" }
@@ -19,6 +20,8 @@ lifecycle-service            = { group = "androidx.lifecycle",         name = "l
 lifecycle-viewmodel-compose  = { group = "androidx.lifecycle",         name = "lifecycle-viewmodel-compose",    version.ref = "lifecycle" }
 
 compose-ui-text-google-fonts = { group = "androidx.compose.ui", name = "ui-text-google-fonts" }
+junit                        = { group = "junit",                name = "junit",                          version.ref = "junit" }
+kotlin-test                  = { group = "org.jetbrains.kotlin", name = "kotlin-test",                   version.ref = "kotlin" }
 
 [plugins]
 android-application = { id = "com.android.application",          version.ref = "agp" }

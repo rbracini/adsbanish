@@ -9,8 +9,25 @@ permissions:
   contents: write
 
 jobs:
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Run unit tests
+        run: ./gradlew test
+
   build:
     name: Build & Publish Release
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
