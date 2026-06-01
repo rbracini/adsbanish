@@ -16,9 +16,19 @@ android {
         versionName = "1.0.0"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile     = file(System.getenv("KEYSTORE_PATH") ?: "adsbanish.keystore")
+            storePassword = System.getenv("STORE_PASSWORD") ?: ""
+            keyAlias      = System.getenv("KEY_ALIAS")      ?: ""
+            keyPassword   = System.getenv("KEY_PASSWORD")   ?: ""
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig   = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
