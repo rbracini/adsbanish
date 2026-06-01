@@ -111,13 +111,15 @@ AdBlockVpnService                (foreground, VpnService)
 
 ### From release APK
 
-Download the latest APK from [`/release`](./release) and install directly:
+Download the latest APK from [**Releases**](https://github.com/rbracini/adsbanish/releases/latest) and install directly:
 
 ```bash
-adb install release/adsbanish_v1.0.0.apk
+adb install adsbanish_vX.Y.Z.apk
 ```
 
 Or transfer to device and open with any file manager (requires *Install from unknown sources*).
+
+> Each release is automatically built and signed via GitHub Actions on every version tag.
 
 ### Build from source
 
