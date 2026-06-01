@@ -382,7 +382,7 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
             }
 
             Row(
-                modifier          = Modifier.align(Alignment.TopStart).padding(start = 10.dp, top = 7.dp),
+                modifier          = Modifier.align(Alignment.TopStart).padding(start = 14.dp, top = 7.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -406,9 +406,9 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
                 text       = "v${BuildConfig.VERSION_NAME}",
                 fontFamily = JBMono,
                 fontWeight = FontWeight.Normal,
-                fontSize   = 7.sp,
+                fontSize   = 8.sp,
                 color      = TxtDim,
-                modifier   = Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 7.dp)
+                modifier   = Modifier.align(Alignment.BottomEnd).padding(end = 14.dp, bottom = 7.dp)
             )
         }
     }
