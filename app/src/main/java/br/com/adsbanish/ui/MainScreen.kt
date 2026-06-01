@@ -5,25 +5,24 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.fontResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.content.Intent
@@ -76,7 +75,7 @@ fun MainScreen(
 
     val inf = rememberInfiniteTransition(label = "anim")
 
-    // Scan line: fraction 0..1 across shield height
+    // Scan line: fraction -0.12..1.0 across shield height
     val scanFraction by inf.animateFloat(
         initialValue = -0.12f,
         targetValue  = 1.0f,
@@ -86,7 +85,7 @@ fun MainScreen(
         ), label = "scan"
     )
 
-    // Cursor blink: 1 for 500ms, 0 for 500ms
+    // Cursor blink: steps(1) at 1s
     val cursorAlpha by inf.animateFloat(
         initialValue = 0f,
         targetValue  = 0f,
@@ -122,59 +121,63 @@ fun MainScreen(
                 .padding(padding)
                 .background(Bg)
                 .drawBehind {
-                    // Subtle background grid
+                    // Background grid 24×24px
                     val step = 24.dp.toPx()
-                    val lineClr = if (isActive) Color(0x08003319) else Color(0x06FFFFFF)
+                    val lineClr = if (isActive) Color(0x0800FF66) else Color(0x06FFFFFF)
                     var y = 0f; while (y <= size.height) {
                         drawLine(lineClr, Offset(0f, y), Offset(size.width, y), 1f); y += step
                     }
                     var x = 0f; while (x <= size.width) {
                         drawLine(lineClr, Offset(x, 0f), Offset(x, size.height), 1f); x += step
                     }
+                    // Radial mask: grid fades from center-top toward edges
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            colorStops = arrayOf(
+                                0.0f to Color.Transparent,
+                                0.55f to Color.Transparent,
+                                1.0f to Color.Black
+                            ),
+                            center = Offset(size.width / 2f, 0f),
+                            radius = maxOf(size.width, size.height) * 1.1f
+                        )
+                    )
                 }
         ) {
+            // ── Top content ──────────────────────────────────────────────────
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
                     .padding(horizontal = 24.dp)
-                    .padding(top = 20.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .padding(top = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // ── BrandHeader ──────────────────────────────────────────────
                 BrandHeader(isActive = isActive)
-
                 Spacer(Modifier.height(32.dp))
-
-                // ── ShieldArt ────────────────────────────────────────────────
                 ShieldArt(
                     isActive     = isActive,
                     scanFraction = if (isActive) scanFraction else -1f,
                     cursorAlpha  = if (isActive) cursorAlpha else 0f
                 )
-
                 Spacer(Modifier.height(28.dp))
-
-                // ── Status ───────────────────────────────────────────────────
-                StatusSection(isActive = isActive)
-
+                StatusPill(isActive = isActive)
                 Spacer(Modifier.height(20.dp))
-
-                // ── MetaLine ─────────────────────────────────────────────────
                 MetaLine(domainCount = domainCount, uptime = uptime, isActive = isActive)
+            }
 
-                Spacer(modifier = Modifier.weight(1f))
-                Spacer(Modifier.height(40.dp))
-
-                // ── Buttons ──────────────────────────────────────────────────
+            // ── Buttons — 140dp above screen base ────────────────────────────
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 140.dp)
+            ) {
                 MainToggleButton(
-                    isActive    = isActive,
-                    onClick     = { onVpnToggle(state) }
+                    isActive = isActive,
+                    onClick  = { onVpnToggle(state) }
                 )
-
                 Spacer(Modifier.height(12.dp))
-
-                // ── Auto-start warning ────────────────────────────────────────
                 if (autoStartHint) {
                     val ctx = LocalContext.current
                     AutoStartWarningCard(
@@ -189,30 +192,28 @@ fun MainScreen(
                     )
                     Spacer(Modifier.height(12.dp))
                 }
-
                 UpdateButton(
-                    isDownloading = isDownloading,
-                    downloadState = downloadState,
+                    isDownloading  = isDownloading,
+                    downloadState  = downloadState,
                     downloadStatus = downloadStatus,
-                    onClick = { viewModel.updateBlocklist() }
+                    onClick        = { viewModel.updateBlocklist() }
                 )
-
-                Spacer(Modifier.height(20.dp))
-
-                // ── Footer ───────────────────────────────────────────────────
-                Text(
-                    text       = "ÚLT. ATT $lastUpdate",
-                    fontFamily = JBMono,
-                    fontWeight = FontWeight.Normal,
-                    fontSize   = 9.sp,
-                    letterSpacing = 1.sp,
-                    color      = TxtDim,
-                    textAlign  = TextAlign.Center,
-                    modifier   = Modifier.fillMaxWidth()
-                )
-
-                Spacer(Modifier.height(32.dp))
             }
+
+            // ── Footer — at screen base ───────────────────────────────────────
+            Text(
+                text          = "ÚLT. ATT $lastUpdate",
+                fontFamily    = JBMono,
+                fontWeight    = FontWeight.Normal,
+                fontSize      = 9.sp,
+                letterSpacing = 1.sp,
+                color         = TxtDim,
+                textAlign     = TextAlign.Center,
+                modifier      = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp)
+            )
         }
     }
 }
@@ -221,31 +222,33 @@ fun MainScreen(
 @Composable
 private fun BrandHeader(isActive: Boolean) {
     Row(
-        modifier            = Modifier.fillMaxWidth(),
+        modifier              = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment   = Alignment.CenterVertically
+        verticalAlignment     = Alignment.CenterVertically
     ) {
+        // Brand mark: "ads/banish" + colored "_"
         Text(
-            text          = "ADS / BANISH _",
+            text = buildAnnotatedString {
+                withStyle(SpanStyle(color = TxtHi)) { append("ads/banish") }
+                withStyle(SpanStyle(color = if (isActive) Green else TxtHi)) { append("_") }
+            },
             fontFamily    = JBMono,
             fontWeight    = FontWeight.Bold,
             fontSize      = 14.sp,
-            letterSpacing = 2.sp,
-            color         = TxtHi
+            letterSpacing = 2.sp
         )
         Row(
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
-                text          = if (isActive) "LIVE" else "IDLE",
+                text          = if (isActive) "live" else "idle",
                 fontFamily    = JBMono,
                 fontWeight    = FontWeight.Medium,
                 fontSize      = 11.sp,
                 letterSpacing = 2.sp,
                 color         = if (isActive) Green else TxtDim
             )
-            // Indicator square
             Box(
                 modifier = Modifier
                     .size(8.dp)
@@ -264,28 +267,26 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
     val strokeColor = if (isActive) Green else TxtDim
     val shadowColor = if (isActive) Green else Color(0xFF171717)
 
-    // Outer box: shadow + main block
     Box(modifier = Modifier.size(226.dp)) {
-        // Hard-offset shadow
+        // Hard-offset shadow stamp (translate +6,+6)
         Box(
             modifier = Modifier
                 .offset(6.dp, 6.dp)
                 .size(220.dp)
                 .background(shadowColor)
         )
-        // Main block
+        // Main block — background always #0A0A0A, no tint
         Box(
             modifier = Modifier
                 .size(220.dp)
                 .background(Surface)
                 .border(2.5.dp, strokeColor)
         ) {
-            // Canvas layer: grid, scanlines, scan animation, shield SVG
             androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
 
-                // Internal grid
+                // Internal grid 22×22
                 val gridStep = 22.dp.toPx()
                 val gridClr = if (isActive) Color(0x0C00FF66) else Color(0x0CFFFFFF)
                 var gy = 0f; while (gy <= h) {
@@ -295,16 +296,16 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
                     drawLine(gridClr, Offset(gx, 0f), Offset(gx, h), 1f); gx += gridStep
                 }
 
-                // Scanlines (horizontal, subtle)
+                // Scanlines (horizontal, subtle, opacity 0.4)
                 val slStep = 4.dp.toPx()
-                val slClr = Color(0x06FFFFFF)
+                val slClr  = Color(0x0AFFFFFF)
                 var sy = 0f; while (sy <= h) {
                     drawLine(slClr, Offset(0f, sy), Offset(w, sy), 1f); sy += slStep
                 }
 
-                // Scan animation (vertical sweep, active only)
+                // Vertical scan sweep — active only, max opacity 0.5, blend=Screen
                 if (scanFraction >= 0f) {
-                    val scanH = 26.dp.toPx()
+                    val scanH   = 26.dp.toPx()
                     val scanTop = scanFraction * h - scanH
                     clipRect(0f, 0f, w, h) {
                         drawRect(
@@ -317,38 +318,36 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
                                 startY = scanTop,
                                 endY   = scanTop + scanH
                             ),
-                            topLeft = Offset(0f, scanTop),
-                            size    = Size(w, scanH),
+                            topLeft   = Offset(0f, scanTop),
+                            size      = Size(w, scanH),
                             blendMode = BlendMode.Screen
                         )
                     }
                 }
 
-                // ── Shield path (coordinate space 120×140) ──────────────────
-                val scale  = h * 0.75f / 140f
-                val ox     = (w - 120f * scale) / 2f
-                val oy     = (h - 140f * scale) / 2f
+                // Shield path (coordinate space 120×140)
+                val scale = h * 0.75f / 140f
+                val ox    = (w - 120f * scale) / 2f
+                val oy    = (h - 140f * scale) / 2f
 
                 val shield = Path().apply {
                     moveTo(ox + 60*scale, oy + 6*scale)
                     lineTo(ox + 108*scale, oy + 24*scale)
                     lineTo(ox + 108*scale, oy + 70*scale)
                     quadraticBezierTo(ox + 108*scale, oy + 108*scale, ox + 60*scale, oy + 134*scale)
-                    quadraticBezierTo(ox + 12*scale, oy + 108*scale,  ox + 12*scale, oy + 70*scale)
+                    quadraticBezierTo(ox + 12*scale, oy + 108*scale, ox + 12*scale, oy + 70*scale)
                     lineTo(ox + 12*scale, oy + 24*scale)
                     close()
                 }
-
                 drawPath(
                     path  = shield,
                     color = strokeColor,
                     style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
                 )
 
-                // Interior icon
+                // Interior icon — fill transparent in both states
                 val iconStroke = Stroke(width = 6.5.dp.toPx(), cap = StrokeCap.Square)
                 if (isActive) {
-                    // Checkmark: M38 70 L54 86 L84 54
                     val check = Path().apply {
                         moveTo(ox + 38*scale, oy + 70*scale)
                         lineTo(ox + 54*scale, oy + 86*scale)
@@ -356,7 +355,6 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
                     }
                     drawPath(check, Green, style = iconStroke)
                 } else {
-                    // X: M44 54 L76 86 M76 54 L44 86
                     val xPath = Path().apply {
                         moveTo(ox + 44*scale, oy + 54*scale)
                         lineTo(ox + 76*scale, oy + 86*scale)
@@ -366,27 +364,22 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
                     drawPath(xPath, TxtDim, style = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Square))
                 }
 
-                // Corner brackets — inset generoso para aparecer claramente dentro da borda
-                val ba  = 16.dp.toPx()   // comprimento do braço
-                val bw2 = 2.dp.toPx()    // espessura da linha
-                val bi  = 8.dp.toPx()    // inset da borda
+                // Corner brackets — 4× L-shape
+                val ba  = 16.dp.toPx()
+                val bw2 = 2.dp.toPx()
+                val bi  = 8.dp.toPx()
                 val bc  = strokeColor
-                // ┌ top-left
-                drawLine(bc, Offset(bi, bi),      Offset(bi + ba, bi),      bw2)
-                drawLine(bc, Offset(bi, bi),      Offset(bi,      bi + ba), bw2)
-                // ┐ top-right
-                drawLine(bc, Offset(w - bi - ba, bi), Offset(w - bi, bi),      bw2)
-                drawLine(bc, Offset(w - bi,      bi), Offset(w - bi, bi + ba), bw2)
-                // └ bottom-left
-                drawLine(bc, Offset(bi, h - bi - ba), Offset(bi,      h - bi), bw2)
-                drawLine(bc, Offset(bi, h - bi),      Offset(bi + ba, h - bi), bw2)
-                // ┘ bottom-right
-                drawLine(bc, Offset(w - bi, h - bi - ba), Offset(w - bi,      h - bi), bw2)
-                drawLine(bc, Offset(w - bi - ba, h - bi), Offset(w - bi,      h - bi), bw2)
+                drawLine(bc, Offset(bi, bi),           Offset(bi + ba, bi),      bw2)
+                drawLine(bc, Offset(bi, bi),           Offset(bi,      bi + ba), bw2)
+                drawLine(bc, Offset(w-bi-ba, bi),      Offset(w-bi,    bi),      bw2)
+                drawLine(bc, Offset(w-bi,    bi),      Offset(w-bi,    bi+ba),   bw2)
+                drawLine(bc, Offset(bi,      h-bi-ba), Offset(bi,      h-bi),    bw2)
+                drawLine(bc, Offset(bi,      h-bi),    Offset(bi+ba,   h-bi),    bw2)
+                drawLine(bc, Offset(w-bi,    h-bi-ba), Offset(w-bi,    h-bi),    bw2)
+                drawLine(bc, Offset(w-bi-ba, h-bi),    Offset(w-bi,    h-bi),    bw2)
             }
 
-            // Corner labels — padding > bi(8dp) + ba(16dp) para ficar dentro do frame
-            // Top-left: STATUS:OK / STATUS:--
+            // Top-left: STATUS:OK + blinking cursor (active) / STATUS:-- (inactive)
             Row(
                 modifier          = Modifier.align(Alignment.TopStart).padding(start = 14.dp, top = 13.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -408,7 +401,7 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
                 }
             }
 
-            // Bottom-right: app version
+            // Bottom-right: version
             Text(
                 text       = "v${BuildConfig.VERSION_NAME}",
                 fontFamily = JBMono,
@@ -421,42 +414,28 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
     }
 }
 
-// ── StatusSection ─────────────────────────────────────────────────────────────
+// ── StatusPill ────────────────────────────────────────────────────────────────
 @Composable
-private fun StatusSection(isActive: Boolean) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+private fun StatusPill(isActive: Boolean) {
+    Row(
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Row(
-            verticalAlignment    = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            // Square icon
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .then(
-                        if (isActive) Modifier.background(Green)
-                        else Modifier.border(1.5.dp, TxtMid)
-                    )
-            )
-            Text(
-                text          = if (isActive) "PROTEÇÃO ATIVA" else "PROTEÇÃO INATIVA",
-                fontFamily    = JBMono,
-                fontWeight    = FontWeight.ExtraBold,
-                fontSize      = 18.sp,
-                letterSpacing = 2.sp,
-                color         = if (isActive) Green else TxtHi
-            )
-        }
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .then(
+                    if (isActive) Modifier.background(Green)
+                    else Modifier.border(1.5.dp, TxtMid)
+                )
+        )
         Text(
-            text          = if (isActive) "— FILTRANDO TRÁFEGO —" else "— TRÁFEGO LIVRE —",
+            text          = if (isActive) "FILTRANDO TRÁFEGO" else "TRÁFEGO LIVRE",
             fontFamily    = JBMono,
-            fontWeight    = FontWeight.Normal,
-            fontSize      = 11.sp,
+            fontWeight    = FontWeight.ExtraBold,
+            fontSize      = 18.sp,
             letterSpacing = 2.sp,
-            color         = TxtDim
+            color         = if (isActive) Green else TxtHi
         )
     }
 }
@@ -472,7 +451,6 @@ private fun MetaLine(domainCount: Int, uptime: String, isActive: Boolean) {
             .padding(horizontal = 20.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Domains
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text       = NumberFormat.getNumberInstance(Locale("pt", "BR")).format(domainCount),
@@ -491,10 +469,8 @@ private fun MetaLine(domainCount: Int, uptime: String, isActive: Boolean) {
             )
         }
 
-        // Divider
         Box(modifier = Modifier.width(1.5.dp).height(36.dp).background(BorderHi))
 
-        // Uptime
         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
             Text(
                 text       = uptime,
@@ -521,7 +497,6 @@ private fun MainToggleButton(isActive: Boolean, onClick: () -> Unit) {
     val accent = if (isActive) Red else Green
 
     Box(modifier = Modifier.fillMaxWidth().height(77.dp)) {
-        // Shadow stamp
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -539,21 +514,17 @@ private fun MainToggleButton(isActive: Boolean, onClick: () -> Unit) {
                 contentColor   = accent
             )
         ) {
-            // Icon
             if (isActive) {
-                // Pause ‖
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Box(Modifier.width(4.dp).height(18.dp).background(accent))
                     Box(Modifier.width(4.dp).height(18.dp).background(accent))
                 }
             } else {
-                // Power circle + vertical line
                 androidx.compose.foundation.Canvas(modifier = Modifier.size(18.dp)) {
                     val cx = size.width / 2f
                     val cy = size.height / 2f
                     val r  = size.minDimension / 2f - 2.dp.toPx()
                     val sw = 2.5.dp.toPx()
-                    // Arc with gap at top (~40deg gap)
                     drawArc(
                         color      = accent,
                         startAngle = -220f,
@@ -561,7 +532,6 @@ private fun MainToggleButton(isActive: Boolean, onClick: () -> Unit) {
                         useCenter  = false,
                         style      = Stroke(sw, cap = StrokeCap.Round)
                     )
-                    // Vertical line through gap
                     drawLine(accent, Offset(cx, 0f), Offset(cx, cy), sw)
                 }
             }
@@ -701,7 +671,6 @@ private fun UpdateButton(
                     color         = TxtDim
                 )
             } else {
-                // Refresh icon
                 androidx.compose.foundation.Canvas(modifier = Modifier.size(14.dp)) {
                     val cx = size.width / 2f
                     val cy = size.height / 2f
@@ -713,7 +682,6 @@ private fun UpdateButton(
                         useCenter  = false,
                         style      = Stroke(2.dp.toPx(), cap = StrokeCap.Round)
                     )
-                    // Arrow tip
                     val tip = Path().apply {
                         moveTo(cx + r, cy - 3.dp.toPx())
                         lineTo(cx + r + 3.dp.toPx(), cy)
@@ -733,7 +701,6 @@ private fun UpdateButton(
             }
         }
 
-        // Progress bar (visible during download)
         if (isDownloading) {
             val progress = (downloadState as? DownloadState.Loading)?.progress ?: 0
             Spacer(Modifier.height(8.dp))

@@ -58,11 +58,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val startMs = System.currentTimeMillis()
         uptimeJob = viewModelScope.launch {
             while (isActive) {
-                val elapsed = System.currentTimeMillis() - startMs
-                val h = elapsed / 3_600_000
-                val m = (elapsed % 3_600_000) / 60_000
-                val s = (elapsed % 60_000) / 1_000
-                _uptime.value = "%02d:%02d:%02d".format(h, m, s)
+                val sec = (System.currentTimeMillis() - startMs) / 1_000
+                _uptime.value = formatUptime(sec)
                 delay(1_000)
             }
         }
@@ -71,7 +68,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun stopUptimeTimer() {
         uptimeJob?.cancel()
         uptimeJob = null
-        _uptime.value = "--:--:--"
+        _uptime.value = "--d --:--"
+    }
+
+    // < 24h → HH:MM:SS · ≥ 1d → Dd HH:MM · ≥ 100d → Dd HHh
+    private fun formatUptime(sec: Long): String {
+        val d = sec / 86400
+        val h = (sec % 86400) / 3600
+        val m = (sec % 3600) / 60
+        val s = sec % 60
+        val pad = { n: Long -> n.toString().padStart(2, '0') }
+        return when {
+            d == 0L  -> "${pad(h)}:${pad(m)}:${pad(s)}"
+            d < 100L -> "${d}d ${pad(h)}:${pad(m)}"
+            else     -> "${d}d ${pad(h)}h"
+        }
     }
 
     fun updateBlocklist() {

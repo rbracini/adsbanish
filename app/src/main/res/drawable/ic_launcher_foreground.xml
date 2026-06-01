@@ -1,40 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Adaptive icon: canvas 108×108dp
-  Safe zone circular: raio 33dp centrado em (54,54)
-  Todo o conteúdo deve ficar dentro desse raio para não ser cortado pelo launcher
-  Escala 0.55 do SVG original (100×100), centrado em (54,54)
+  Adaptive icon foreground — Opção A (spec: viewBox 0 0 100 100, scaled to 108×108)
+  Safe area ~18% → conteúdo seguro entre 19–89dp
+  Escudo verde sólido + checkmark preto recortado + brackets verdes nos cantos
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
+    android:viewportWidth="100"
+    android:viewportHeight="100">
 
-    <!--
-      Corner brackets — cantos do quadrado 32..76 (distância ao centro ≈31dp < raio33)
-      Braço de 7dp para caber com folga
-    -->
+    <!-- Corner brackets -->
     <path
         android:fillColor="#00000000"
         android:strokeColor="#00FF66"
-        android:strokeWidth="2"
-        android:pathData="M32,39 L32,32 L39,32
-                          M69,32 L76,32 L76,39
-                          M32,69 L32,76 L39,76
-                          M69,76 L76,76 L76,69"/>
+        android:strokeWidth="2.5"
+        android:pathData="M10 18 L10 10 L18 10
+                          M82 10 L90 10 L90 18
+                          M10 82 L10 90 L18 90
+                          M82 90 L90 90 L90 82"/>
 
-    <!-- Escudo — scale 0.55 do SVG original, centrado em (54,54) -->
+    <!-- Shield — solid green fill -->
     <path
         android:fillColor="#00FF66"
-        android:pathData="M54,30 L74,38 L74,55 Q74,69 54,78 Q34,69 34,55 L34,38 Z"/>
+        android:pathData="M50 8 L86 22 L86 54 Q86 80 50 96 Q14 80 14 54 L14 22 Z"/>
 
-    <!-- Checkmark — scale 0.55 -->
+    <!-- Checkmark — black cutout over shield -->
     <path
         android:fillColor="#00000000"
         android:strokeColor="#000000"
-        android:strokeWidth="4"
+        android:strokeWidth="6"
         android:strokeLineCap="square"
         android:strokeLineJoin="miter"
-        android:pathData="M45,54 L52,61 L65,47"/>
+        android:pathData="M33 52 L46 64 L70 40"/>
+
 </vector>
