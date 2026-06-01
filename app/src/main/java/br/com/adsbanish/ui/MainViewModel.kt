@@ -47,8 +47,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch {
             AdBlockVpnService.state.collect { vpnState ->
-                if (vpnState is VpnState.Active) startUptimeTimer()
-                else stopUptimeTimer()
+                if (vpnState is VpnState.Active) {
+                    startUptimeTimer()
+                    _autoStartHint.value = false   // auto-dismiss when VPN starts
+                } else {
+                    stopUptimeTimer()
+                }
             }
         }
     }
@@ -106,9 +110,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun dismissError() {
-        _downloadState.value = DownloadState.Idle
-    }
+    fun dismissError() { _downloadState.value = DownloadState.Idle }
+    fun dismissDownload() { if (_downloadState.value !is DownloadState.Loading) _downloadState.value = DownloadState.Idle }
 
     fun notifyAutoStartNeeded() { _autoStartHint.value = true }
     fun dismissAutoStartHint()  { _autoStartHint.value = false }

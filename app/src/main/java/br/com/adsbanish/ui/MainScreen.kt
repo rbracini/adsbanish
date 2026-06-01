@@ -4,6 +4,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,6 +26,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -73,9 +76,16 @@ fun MainScreen(
     val isActive      = state is VpnState.Active
     val isDownloading = downloadState is DownloadState.Loading
 
+    var showHelpDialog     by remember { mutableStateOf(false) }
+    var showDownloadDialog by remember { mutableStateOf(false) }
+
+    // Auto-show download dialog when download starts (survives recomposition)
+    LaunchedEffect(downloadState) {
+        if (downloadState is DownloadState.Loading) showDownloadDialog = true
+    }
+
     val inf = rememberInfiniteTransition(label = "anim")
 
-    // Scan line: fraction -0.12..1.0 across shield height
     val scanFraction by inf.animateFloat(
         initialValue = -0.12f,
         targetValue  = 1.0f,
@@ -85,7 +95,6 @@ fun MainScreen(
         ), label = "scan"
     )
 
-    // Cursor blink: steps(1) at 1s
     val cursorAlpha by inf.animateFloat(
         initialValue = 0f,
         targetValue  = 0f,
@@ -100,128 +109,121 @@ fun MainScreen(
         ), label = "cursor"
     )
 
-    val snackbarHostState = remember { SnackbarHostState() }
-    LaunchedEffect(downloadState) {
-        if (downloadState is DownloadState.Error) {
-            snackbarHostState.showSnackbar(
-                message     = (downloadState as DownloadState.Error).message,
-                actionLabel = "OK"
-            )
-            viewModel.dismissError()
-        }
+    // ── Dialogs ───────────────────────────────────────────────────────────────
+    if (showHelpDialog) {
+        HelpDialog(onDismiss = { showHelpDialog = false })
     }
 
-    Scaffold(
-        snackbarHost   = { SnackbarHost(snackbarHostState) },
-        containerColor = Bg
-    ) { padding ->
-        Box(
+    if (showDownloadDialog) {
+        DownloadDialog(
+            downloadState  = downloadState,
+            downloadStatus = downloadStatus,
+            domainCount    = domainCount,
+            onDismiss      = {
+                showDownloadDialog = false
+                viewModel.dismissDownload()
+            }
+        )
+    }
+
+    // ── Layout ────────────────────────────────────────────────────────────────
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Bg)
+            .drawBehind {
+                val step = 24.dp.toPx()
+                val lineClr = if (isActive) Color(0x0800FF66) else Color(0x06FFFFFF)
+                var y = 0f; while (y <= size.height) {
+                    drawLine(lineClr, Offset(0f, y), Offset(size.width, y), 1f); y += step
+                }
+                var x = 0f; while (x <= size.width) {
+                    drawLine(lineClr, Offset(x, 0f), Offset(x, size.height), 1f); x += step
+                }
+                drawRect(
+                    brush = Brush.radialGradient(
+                        colorStops = arrayOf(
+                            0.0f to Color.Transparent,
+                            0.55f to Color.Transparent,
+                            1.0f to Color.Black
+                        ),
+                        center = Offset(size.width / 2f, 0f),
+                        radius = maxOf(size.width, size.height) * 1.1f
+                    )
+                )
+            }
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .background(Bg)
-                .drawBehind {
-                    // Background grid 24×24px
-                    val step = 24.dp.toPx()
-                    val lineClr = if (isActive) Color(0x0800FF66) else Color(0x06FFFFFF)
-                    var y = 0f; while (y <= size.height) {
-                        drawLine(lineClr, Offset(0f, y), Offset(size.width, y), 1f); y += step
-                    }
-                    var x = 0f; while (x <= size.width) {
-                        drawLine(lineClr, Offset(x, 0f), Offset(x, size.height), 1f); x += step
-                    }
-                    // Radial mask: grid fades from center-top toward edges
-                    drawRect(
-                        brush = Brush.radialGradient(
-                            colorStops = arrayOf(
-                                0.0f to Color.Transparent,
-                                0.55f to Color.Transparent,
-                                1.0f to Color.Black
-                            ),
-                            center = Offset(size.width / 2f, 0f),
-                            radius = maxOf(size.width, size.height) * 1.1f
-                        )
-                    )
-                }
+                .padding(horizontal = 24.dp)
+                .padding(top = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Single column — weight(1f) spacer empurra os botões para baixo
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 24.dp)
-                    .padding(top = 20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // ── Top content ──────────────────────────────────────────────
-                BrandHeader(isActive = isActive)
-                Spacer(Modifier.height(32.dp))
-                ShieldArt(
-                    isActive     = isActive,
-                    scanFraction = if (isActive) scanFraction else -1f,
-                    cursorAlpha  = if (isActive) cursorAlpha else 0f
-                )
-                Spacer(Modifier.height(28.dp))
-                StatusPill(isActive = isActive)
-                Spacer(Modifier.height(20.dp))
-                MetaLine(domainCount = domainCount, uptime = uptime, isActive = isActive)
+            BrandHeader(isActive = isActive, onHelpClick = { showHelpDialog = true })
+            Spacer(Modifier.height(32.dp))
+            ShieldArt(
+                isActive     = isActive,
+                scanFraction = if (isActive) scanFraction else -1f,
+                cursorAlpha  = if (isActive) cursorAlpha else 0f
+            )
+            Spacer(Modifier.height(28.dp))
+            StatusPill(isActive = isActive)
+            Spacer(Modifier.height(20.dp))
+            MetaLine(domainCount = domainCount, uptime = uptime, isActive = isActive)
 
-                // ── Spacer empurra para ~20% acima da base ───────────────────
-                Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.weight(1f))
 
-                // ── Buttons ──────────────────────────────────────────────────
-                MainToggleButton(
-                    isActive = isActive,
-                    onClick  = { onVpnToggle(state) }
+            MainToggleButton(isActive = isActive, onClick = { onVpnToggle(state) })
+            Spacer(Modifier.height(12.dp))
+
+            if (autoStartHint) {
+                val ctx = LocalContext.current
+                AutoStartWarningCard(
+                    onOpenSettings = {
+                        ctx.startActivity(
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.parse("package:${ctx.packageName}")
+                            }
+                        )
+                    },
+                    onDismiss = { viewModel.dismissAutoStartHint() }
                 )
                 Spacer(Modifier.height(12.dp))
-                if (autoStartHint) {
-                    val ctx = LocalContext.current
-                    AutoStartWarningCard(
-                        onOpenSettings = {
-                            ctx.startActivity(
-                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                    data = Uri.parse("package:${ctx.packageName}")
-                                }
-                            )
-                        },
-                        onDismiss = { viewModel.dismissAutoStartHint() }
-                    )
-                    Spacer(Modifier.height(12.dp))
-                }
-                UpdateButton(
-                    isDownloading  = isDownloading,
-                    downloadState  = downloadState,
-                    downloadStatus = downloadStatus,
-                    onClick        = { viewModel.updateBlocklist() }
-                )
-
-                // ── Footer ───────────────────────────────────────────────────
-                Spacer(Modifier.height(20.dp))
-                Text(
-                    text          = "ÚLT. ATT $lastUpdate",
-                    fontFamily    = JBMono,
-                    fontWeight    = FontWeight.Normal,
-                    fontSize      = 9.sp,
-                    letterSpacing = 1.sp,
-                    color         = TxtDim,
-                    textAlign     = TextAlign.Center,
-                    modifier      = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(28.dp))
             }
+
+            UpdateButton(
+                isDownloading = isDownloading,
+                onClick = {
+                    viewModel.updateBlocklist()
+                    showDownloadDialog = true
+                }
+            )
+
+            Spacer(Modifier.height(20.dp))
+            Text(
+                text          = "ÚLT. ATT $lastUpdate",
+                fontFamily    = JBMono,
+                fontWeight    = FontWeight.Normal,
+                fontSize      = 9.sp,
+                letterSpacing = 1.sp,
+                color         = TxtDim,
+                textAlign     = TextAlign.Center,
+                modifier      = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(28.dp))
         }
     }
 }
 
 // ── BrandHeader ───────────────────────────────────────────────────────────────
 @Composable
-private fun BrandHeader(isActive: Boolean) {
+private fun BrandHeader(isActive: Boolean, onHelpClick: () -> Unit) {
     Row(
         modifier              = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment     = Alignment.CenterVertically
     ) {
-        // Brand mark: "ads/banish" + colored "_"
         Text(
             text = buildAnnotatedString {
                 withStyle(SpanStyle(color = TxtHi)) { append("ads/banish") }
@@ -234,8 +236,20 @@ private fun BrandHeader(isActive: Boolean) {
         )
         Row(
             verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            // Help button
+            Text(
+                text          = "?",
+                fontFamily    = JBMono,
+                fontWeight    = FontWeight.Bold,
+                fontSize      = 13.sp,
+                color         = TxtDim,
+                modifier      = Modifier
+                    .clickable(onClick = onHelpClick)
+                    .border(1.dp, TxtDim)
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            )
             Text(
                 text          = if (isActive) "live" else "idle",
                 fontFamily    = JBMono,
@@ -263,14 +277,12 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
     val shadowColor = if (isActive) Green else Color(0xFF171717)
 
     Box(modifier = Modifier.size(226.dp)) {
-        // Hard-offset shadow stamp (translate +6,+6)
         Box(
             modifier = Modifier
                 .offset(6.dp, 6.dp)
                 .size(220.dp)
                 .background(shadowColor)
         )
-        // Main block — background always #0A0A0A, no tint
         Box(
             modifier = Modifier
                 .size(220.dp)
@@ -281,7 +293,6 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
                 val w = size.width
                 val h = size.height
 
-                // Internal grid 22×22
                 val gridStep = 22.dp.toPx()
                 val gridClr = if (isActive) Color(0x0C00FF66) else Color(0x0CFFFFFF)
                 var gy = 0f; while (gy <= h) {
@@ -291,14 +302,12 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
                     drawLine(gridClr, Offset(gx, 0f), Offset(gx, h), 1f); gx += gridStep
                 }
 
-                // Scanlines (horizontal, subtle, opacity 0.4)
                 val slStep = 4.dp.toPx()
                 val slClr  = Color(0x0AFFFFFF)
                 var sy = 0f; while (sy <= h) {
                     drawLine(slClr, Offset(0f, sy), Offset(w, sy), 1f); sy += slStep
                 }
 
-                // Vertical scan sweep — active only, max opacity 0.5, blend=Screen
                 if (scanFraction >= 0f) {
                     val scanH   = 26.dp.toPx()
                     val scanTop = scanFraction * h - scanH
@@ -320,7 +329,6 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
                     }
                 }
 
-                // Shield path (coordinate space 120×140)
                 val scale = h * 0.75f / 140f
                 val ox    = (w - 120f * scale) / 2f
                 val oy    = (h - 140f * scale) / 2f
@@ -329,8 +337,8 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
                     moveTo(ox + 60*scale, oy + 6*scale)
                     lineTo(ox + 108*scale, oy + 24*scale)
                     lineTo(ox + 108*scale, oy + 70*scale)
-                    quadraticBezierTo(ox + 108*scale, oy + 108*scale, ox + 60*scale, oy + 134*scale)
-                    quadraticBezierTo(ox + 12*scale, oy + 108*scale, ox + 12*scale, oy + 70*scale)
+                    quadraticTo(ox + 108*scale, oy + 108*scale, ox + 60*scale, oy + 134*scale)
+                    quadraticTo(ox + 12*scale, oy + 108*scale, ox + 12*scale, oy + 70*scale)
                     lineTo(ox + 12*scale, oy + 24*scale)
                     close()
                 }
@@ -340,7 +348,6 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
                     style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
                 )
 
-                // Interior icon — fill transparent in both states
                 val iconStroke = Stroke(width = 6.5.dp.toPx(), cap = StrokeCap.Square)
                 if (isActive) {
                     val check = Path().apply {
@@ -359,7 +366,6 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
                     drawPath(xPath, TxtDim, style = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Square))
                 }
 
-                // Corner brackets — 4× L-shape
                 val ba  = 16.dp.toPx()
                 val bw2 = 2.dp.toPx()
                 val bi  = 8.dp.toPx()
@@ -374,7 +380,6 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
                 drawLine(bc, Offset(w-bi-ba, h-bi),    Offset(w-bi,    h-bi),    bw2)
             }
 
-            // Top-left: STATUS:OK + blinking cursor (active) / STATUS:-- (inactive)
             Row(
                 modifier          = Modifier.align(Alignment.TopStart).padding(start = 10.dp, top = 7.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -396,7 +401,6 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
                 }
             }
 
-            // Bottom-right: version
             Text(
                 text       = "v${BuildConfig.VERSION_NAME}",
                 fontFamily = JBMono,
@@ -554,73 +558,52 @@ private fun AutoStartWarningCard(onOpenSettings: () -> Unit, onDismiss: () -> Un
                 .offset(4.dp, 4.dp)
                 .background(Amber.copy(alpha = 0.25f))
         )
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Surface)
                 .border(1.5.dp, Amber)
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(
-                text          = "! AUTO-START BLOQUEADO",
-                fontFamily    = JBMono,
-                fontWeight    = FontWeight.ExtraBold,
-                fontSize      = 11.sp,
-                letterSpacing = 2.sp,
-                color         = Amber
-            )
-            Text(
-                text       = "O VPN não foi reiniciado automaticamente no boot. O sistema bloqueou o início em segundo plano.",
-                fontFamily = JBMono,
-                fontWeight = FontWeight.Normal,
-                fontSize   = 11.sp,
-                color      = TxtMid
-            )
-            Text(
-                text       = "Config. → Apps → ADSBanish → Bateria\n→ Sem restrições (ou Irrestrito)",
-                fontFamily = JBMono,
-                fontWeight = FontWeight.Medium,
-                fontSize   = 10.sp,
-                color      = TxtHi
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text          = "! AUTO-START BLOQUEADO",
+                    fontFamily    = JBMono,
+                    fontWeight    = FontWeight.ExtraBold,
+                    fontSize      = 10.sp,
+                    letterSpacing = 1.5.sp,
+                    color         = Amber
+                )
+                Text(
+                    text       = "Apps → ADSBanish → Bateria → Sem restrições\nSamsung: ative \"Inicialização automática\"",
+                    fontFamily = JBMono,
+                    fontWeight = FontWeight.Normal,
+                    fontSize   = 9.sp,
+                    color      = TxtMid
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedButton(
                     onClick  = onOpenSettings,
-                    modifier = Modifier.weight(1f).height(40.dp),
+                    modifier = Modifier.height(32.dp),
                     shape    = RectangleShape,
                     border   = BorderStroke(1.5.dp, Amber),
-                    colors   = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Bg, contentColor = Amber
-                    )
+                    colors   = ButtonDefaults.outlinedButtonColors(containerColor = Bg, contentColor = Amber),
+                    contentPadding = PaddingValues(horizontal = 10.dp)
                 ) {
-                    Text(
-                        text          = "CONFIGURAR",
-                        fontFamily    = JBMono,
-                        fontWeight    = FontWeight.Bold,
-                        fontSize      = 10.sp,
-                        letterSpacing = 1.5.sp
-                    )
+                    Text("CONFIG", fontFamily = JBMono, fontWeight = FontWeight.Bold, fontSize = 9.sp)
                 }
                 OutlinedButton(
                     onClick  = onDismiss,
-                    modifier = Modifier.weight(1f).height(40.dp),
+                    modifier = Modifier.height(32.dp),
                     shape    = RectangleShape,
                     border   = BorderStroke(1.5.dp, TxtDim),
-                    colors   = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Bg, contentColor = TxtDim
-                    )
+                    colors   = ButtonDefaults.outlinedButtonColors(containerColor = Bg, contentColor = TxtDim),
+                    contentPadding = PaddingValues(horizontal = 10.dp)
                 ) {
-                    Text(
-                        text          = "DISPENSAR",
-                        fontFamily    = JBMono,
-                        fontWeight    = FontWeight.Bold,
-                        fontSize      = 10.sp,
-                        letterSpacing = 1.5.sp
-                    )
+                    Text("OK", fontFamily = JBMono, fontWeight = FontWeight.Bold, fontSize = 9.sp)
                 }
             }
         }
@@ -629,92 +612,268 @@ private fun AutoStartWarningCard(onOpenSettings: () -> Unit, onDismiss: () -> Un
 
 // ── UpdateButton ──────────────────────────────────────────────────────────────
 @Composable
-private fun UpdateButton(
-    isDownloading  : Boolean,
+private fun UpdateButton(isDownloading: Boolean, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick  = onClick,
+        enabled  = !isDownloading,
+        modifier = Modifier.fillMaxWidth().height(56.dp),
+        shape    = RectangleShape,
+        border   = BorderStroke(2.dp, if (isDownloading) TxtDim else Green),
+        colors   = ButtonDefaults.outlinedButtonColors(
+            containerColor         = Bg,
+            contentColor           = Green,
+            disabledContainerColor = Bg,
+            disabledContentColor   = TxtDim
+        )
+    ) {
+        if (isDownloading) {
+            CircularProgressIndicator(modifier = Modifier.size(13.dp), color = TxtDim, strokeWidth = 2.dp)
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text          = "BAIXANDO…",
+                fontFamily    = JBMono,
+                fontWeight    = FontWeight.Bold,
+                fontSize      = 13.sp,
+                letterSpacing = 2.5.sp,
+                color         = TxtDim
+            )
+        } else {
+            androidx.compose.foundation.Canvas(modifier = Modifier.size(14.dp)) {
+                val cx = size.width / 2f
+                val cy = size.height / 2f
+                val r  = size.minDimension / 2f - 1.dp.toPx()
+                drawArc(
+                    color      = Green,
+                    startAngle = -30f,
+                    sweepAngle = 300f,
+                    useCenter  = false,
+                    style      = Stroke(2.dp.toPx(), cap = StrokeCap.Round)
+                )
+                val tip = Path().apply {
+                    moveTo(cx + r, cy - 3.dp.toPx())
+                    lineTo(cx + r + 3.dp.toPx(), cy)
+                    lineTo(cx + r, cy + 3.dp.toPx())
+                }
+                drawPath(tip, Green, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+            }
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text          = "ATUALIZAR LISTA",
+                fontFamily    = JBMono,
+                fontWeight    = FontWeight.Bold,
+                fontSize      = 13.sp,
+                letterSpacing = 2.5.sp,
+                color         = Green
+            )
+        }
+    }
+}
+
+// ── DownloadDialog ────────────────────────────────────────────────────────────
+@Composable
+private fun DownloadDialog(
     downloadState  : DownloadState,
     downloadStatus : String,
-    onClick        : () -> Unit
+    domainCount    : Int,
+    onDismiss      : () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        OutlinedButton(
-            onClick  = onClick,
-            enabled  = !isDownloading,
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape    = RectangleShape,
-            border   = BorderStroke(2.dp, if (isDownloading) TxtDim else Green),
-            colors   = ButtonDefaults.outlinedButtonColors(
-                containerColor         = Bg,
-                contentColor           = Green,
-                disabledContainerColor = Bg,
-                disabledContentColor   = TxtDim
+    val isLoading = downloadState is DownloadState.Loading
+    val isError   = downloadState is DownloadState.Error
+    val isSuccess = downloadState is DownloadState.Success
+    val accent    = when { isError -> Red; isSuccess -> Green; else -> TxtMid }
+
+    Dialog(
+        onDismissRequest = { if (!isLoading) onDismiss() },
+        properties = DialogProperties(dismissOnClickOutside = false, dismissOnBackPress = !isLoading)
+    ) {
+        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+            // Hard shadow
+            Box(
+                modifier = Modifier
+                    .offset(4.dp, 4.dp)
+                    .fillMaxWidth()
+                    .background(accent.copy(alpha = if (isLoading) 0.3f else 1f))
             )
-        ) {
-            if (isDownloading) {
-                CircularProgressIndicator(
-                    modifier    = Modifier.size(13.dp),
-                    color       = TxtDim,
-                    strokeWidth = 2.dp
-                )
-                Spacer(Modifier.width(10.dp))
-                val progress = (downloadState as? DownloadState.Loading)?.progress ?: 0
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Surface)
+                    .border(2.dp, accent)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Text(
-                    text          = "BAIXANDO… $progress%",
+                    text = when {
+                        isError   -> "ERRO NA ATUALIZAÇÃO"
+                        isSuccess -> "LISTA ATUALIZADA"
+                        else      -> "ATUALIZANDO LISTA"
+                    },
                     fontFamily    = JBMono,
-                    fontWeight    = FontWeight.Bold,
+                    fontWeight    = FontWeight.ExtraBold,
                     fontSize      = 13.sp,
-                    letterSpacing = 2.5.sp,
-                    color         = TxtDim
+                    letterSpacing = 2.sp,
+                    color         = accent
                 )
-            } else {
-                androidx.compose.foundation.Canvas(modifier = Modifier.size(14.dp)) {
-                    val cx = size.width / 2f
-                    val cy = size.height / 2f
-                    val r  = size.minDimension / 2f - 1.dp.toPx()
-                    drawArc(
-                        color      = Green,
-                        startAngle = -30f,
-                        sweepAngle = 300f,
-                        useCenter  = false,
-                        style      = Stroke(2.dp.toPx(), cap = StrokeCap.Round)
-                    )
-                    val tip = Path().apply {
-                        moveTo(cx + r, cy - 3.dp.toPx())
-                        lineTo(cx + r + 3.dp.toPx(), cy)
-                        lineTo(cx + r, cy + 3.dp.toPx())
+
+                when {
+                    isLoading -> {
+                        val progress = (downloadState as DownloadState.Loading).progress
+                        LinearProgressIndicator(
+                            progress      = { progress / 100f },
+                            modifier      = Modifier.fillMaxWidth().height(2.dp),
+                            color         = Green,
+                            trackColor    = BorderHi,
+                            strokeCap     = StrokeCap.Square
+                        )
+                        Text(
+                            text       = "$progress%",
+                            fontFamily = JBMono,
+                            fontWeight = FontWeight.Bold,
+                            fontSize   = 22.sp,
+                            color      = TxtHi
+                        )
+                        if (downloadStatus.isNotEmpty()) {
+                            Text(
+                                text       = downloadStatus,
+                                fontFamily = JBMono,
+                                fontSize   = 9.sp,
+                                color      = TxtDim
+                            )
+                        }
                     }
-                    drawPath(tip, Green, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    isError -> {
+                        Text(
+                            text       = (downloadState as DownloadState.Error).message,
+                            fontFamily = JBMono,
+                            fontSize   = 11.sp,
+                            color      = TxtMid
+                        )
+                    }
+                    isSuccess -> {
+                        val fmt = NumberFormat.getNumberInstance(Locale("pt", "BR"))
+                        Text(
+                            text       = "${fmt.format(domainCount)} domínios carregados",
+                            fontFamily = JBMono,
+                            fontWeight = FontWeight.Medium,
+                            fontSize   = 14.sp,
+                            color      = TxtHi
+                        )
+                    }
                 }
-                Spacer(Modifier.width(10.dp))
+
+                OutlinedButton(
+                    onClick  = onDismiss,
+                    enabled  = !isLoading,
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    shape    = RectangleShape,
+                    border   = BorderStroke(2.dp, if (isLoading) TxtDim else accent),
+                    colors   = ButtonDefaults.outlinedButtonColors(
+                        containerColor         = Bg,
+                        contentColor           = accent,
+                        disabledContainerColor = Bg,
+                        disabledContentColor   = TxtDim
+                    )
+                ) {
+                    Text(
+                        text          = "OK",
+                        fontFamily    = JBMono,
+                        fontWeight    = FontWeight.ExtraBold,
+                        fontSize      = 14.sp,
+                        letterSpacing = 3.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ── HelpDialog ────────────────────────────────────────────────────────────────
+@Composable
+private fun HelpDialog(onDismiss: () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(dismissOnClickOutside = true)
+    ) {
+        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+            Box(
+                modifier = Modifier
+                    .offset(4.dp, 4.dp)
+                    .fillMaxWidth()
+                    .background(Green)
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Surface)
+                    .border(2.dp, Green)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
                 Text(
-                    text          = "ATUALIZAR LISTA",
+                    text          = "COMO USAR",
                     fontFamily    = JBMono,
-                    fontWeight    = FontWeight.Bold,
+                    fontWeight    = FontWeight.ExtraBold,
                     fontSize      = 13.sp,
-                    letterSpacing = 2.5.sp,
+                    letterSpacing = 2.sp,
                     color         = Green
                 )
-            }
-        }
 
-        if (isDownloading) {
-            val progress = (downloadState as? DownloadState.Loading)?.progress ?: 0
-            Spacer(Modifier.height(8.dp))
-            LinearProgressIndicator(
-                progress   = { progress / 100f },
-                modifier   = Modifier.fillMaxWidth().height(2.dp),
-                color      = Green,
-                trackColor = BorderHi,
-                strokeCap  = StrokeCap.Square
-            )
-            if (downloadStatus.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text       = downloadStatus,
-                    fontFamily = JBMono,
-                    fontSize   = 9.sp,
-                    color      = TxtDim
+                HelpSection(
+                    title = "[ ATIVAR / DESATIVAR ]",
+                    body  = "Toque no botão principal para ligar ou desligar o bloqueio. O app cria uma VPN local — nenhum dado sai do dispositivo."
                 )
+                HelpSection(
+                    title = "[ ATUALIZAR LISTA ]",
+                    body  = "Baixa listas atualizadas de domínios de anúncios e rastreadores de múltiplas fontes. Faça ao instalar e mensalmente."
+                )
+                HelpSection(
+                    title = "[ AUTO-START ]",
+                    body  = "Para iniciar automaticamente após reiniciar:\n" +
+                            "1. Config. → Apps → ADSBanish → Bateria → Sem restrições\n" +
+                            "2. Samsung: Config. → Apps → ADSBanish → Inicialização automática → Ativar"
+                )
+                HelpSection(
+                    title = "[ COMO FUNCIONA ]",
+                    body  = "Intercepta consultas DNS e bloqueia domínios de anúncios e rastreadores. ${"±"}316 mil domínios bloqueados por padrão."
+                )
+
+                OutlinedButton(
+                    onClick  = onDismiss,
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    shape    = RectangleShape,
+                    border   = BorderStroke(2.dp, Green),
+                    colors   = ButtonDefaults.outlinedButtonColors(containerColor = Bg, contentColor = Green)
+                ) {
+                    Text(
+                        text          = "OK",
+                        fontFamily    = JBMono,
+                        fontWeight    = FontWeight.ExtraBold,
+                        fontSize      = 14.sp,
+                        letterSpacing = 3.sp
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun HelpSection(title: String, body: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text          = title,
+            fontFamily    = JBMono,
+            fontWeight    = FontWeight.SemiBold,
+            fontSize      = 10.sp,
+            letterSpacing = 1.sp,
+            color         = TxtHi
+        )
+        Text(
+            text       = body,
+            fontFamily = JBMono,
+            fontWeight = FontWeight.Normal,
+            fontSize   = 10.sp,
+            color      = TxtMid
+        )
     }
 }
