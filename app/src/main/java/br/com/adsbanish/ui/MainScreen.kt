@@ -156,6 +156,7 @@ fun MainScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.systemBars)
                 .padding(horizontal = 24.dp)
                 .padding(top = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -577,7 +578,7 @@ private fun AutoStartWarningCard(onOpenSettings: () -> Unit, onDismiss: () -> Un
                     color         = Amber
                 )
                 Text(
-                    text       = "Apps → ADSBanish → Bateria → Sem restrições\nSamsung: ative \"Inicialização automática\"",
+                    text       = "Config. → Apps → ADSBanish → Bateria → Sem restrições",
                     fontFamily = JBMono,
                     fontWeight = FontWeight.Normal,
                     fontSize   = 9.sp,
@@ -828,9 +829,7 @@ private fun HelpDialog(onDismiss: () -> Unit) {
                 )
                 HelpSection(
                     title = "[ AUTO-START ]",
-                    body  = "Para iniciar automaticamente após reiniciar:\n" +
-                            "1. Config. → Apps → ADSBanish → Bateria → Sem restrições\n" +
-                            "2. Samsung: Config. → Apps → ADSBanish → Inicialização automática → Ativar"
+                    body  = "Para iniciar automaticamente após reiniciar:\nConfig. → Apps → ADSBanish → Bateria → Sem restrições (ou Irrestrito)"
                 )
                 HelpSection(
                     title = "[ COMO FUNCIONA ]",
