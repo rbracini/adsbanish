@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Adaptive icon foreground — Opção A
-  Viewport 108×108dp.
-  Escudo: ~45% do ícone (48×56dp centrado em 54,54) — deixa negro visível ao redor.
-  Brackets: arm 12dp, stroke 3dp, nos cantos de 22..86 (zona squircle Samsung ✓).
-  Contraste: brackets verdes sobre fundo preto fora do escudo verde.
+  Adaptive icon foreground
+  Viewport 108×108dp. Background = black (ic_launcher_background.xml).
+  Shield: 36×42dp centered at (54,54) — x:36..72, y:33..75.
+    Smaller shield leaves black visible around it, matching app screen aesthetic.
+  Brackets: corners at (28,28)/(80,28)/(28,80)/(80,80), arm 12dp.
+    Corner distance from center = 36.8dp — safely inside Samsung squircle (safe up to ~31dp at 45°).
+  Checkmark: green, visible against black inside the shield outline.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -12,28 +14,28 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Corner brackets — arm 12dp, fora do escudo sobre fundo preto -->
+    <!-- Corner brackets — arm 12dp, stroke 3.5dp, corners at 28..80 -->
     <path
         android:fillColor="#00000000"
         android:strokeColor="#00FF66"
-        android:strokeWidth="3"
-        android:pathData="M22,34 L22,22 L34,22
-                          M74,22 L86,22 L86,34
-                          M22,74 L22,86 L34,86
-                          M74,86 L86,86 L86,74"/>
+        android:strokeWidth="3.5"
+        android:pathData="M28,40 L28,28 L40,28
+                          M68,28 L80,28 L80,40
+                          M28,68 L28,80 L40,80
+                          M68,80 L80,80 L80,68"/>
 
-    <!-- Shield solid green — 48×56dp, x:30..78, y:26..82 -->
+    <!-- Shield solid green — 36×42dp, leaves black background visible at corners -->
     <path
         android:fillColor="#00FF66"
-        android:pathData="M54,26 L78,35 L78,55 Q78,71 54,82 Q30,71 30,55 L30,35 Z"/>
+        android:pathData="M54,33 L72,39 L72,57 Q72,69 54,75 Q36,69 36,57 L36,39 Z"/>
 
-    <!-- Checkmark black — proporcional ao escudo menor -->
+    <!-- Checkmark black — on green shield -->
     <path
         android:fillColor="#00000000"
         android:strokeColor="#000000"
         android:strokeWidth="4.5"
-        android:strokeLineCap="square"
-        android:strokeLineJoin="miter"
-        android:pathData="M43,54 L51,62 L67,46"/>
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M44,57 L51,64 L66,48"/>
 
 </vector>
