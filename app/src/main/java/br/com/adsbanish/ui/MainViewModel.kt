@@ -1,0 +1,104 @@
+package br.com.adsbanish.ui
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import br.com.adsbanish.App
+import br.com.adsbanish.vpn.AdBlockVpnService
+import br.com.adsbanish.vpn.VpnState
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+
+sealed class DownloadState {
+    object Idle : DownloadState()
+    data class Loading(val progress: Int) : DownloadState()
+    object Success : DownloadState()
+    data class Error(val message: String) : DownloadState()
+}
+
+class MainViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val repository = (application as App).repository
+
+    private val _downloadState  = MutableStateFlow<DownloadState>(DownloadState.Idle)
+    val downloadState: StateFlow<DownloadState> = _downloadState
+
+    private val _downloadStatus = MutableStateFlow("")
+    val downloadStatus: StateFlow<String> = _downloadStatus
+
+    private val _domainCount = MutableStateFlow(repository.domainCount)
+    val domainCount: StateFlow<Int> = _domainCount
+
+    private val _lastUpdate = MutableStateFlow(repository.lastUpdateFormatted)
+    val lastUpdate: StateFlow<String> = _lastUpdate
+
+    private val _uptime = MutableStateFlow("--:--:--")
+    val uptime: StateFlow<String> = _uptime
+
+    private val _autoStartHint = MutableStateFlow(false)
+    val autoStartHint: StateFlow<Boolean> = _autoStartHint
+
+    private var uptimeJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            AdBlockVpnService.state.collect { vpnState ->
+                if (vpnState is VpnState.Active) startUptimeTimer()
+                else stopUptimeTimer()
+            }
+        }
+    }
+
+    private fun startUptimeTimer() {
+        uptimeJob?.cancel()
+        val startMs = System.currentTimeMillis()
+        uptimeJob = viewModelScope.launch {
+            while (isActive) {
+                val elapsed = System.currentTimeMillis() - startMs
+                val h = elapsed / 3_600_000
+                val m = (elapsed % 3_600_000) / 60_000
+                val s = (elapsed % 60_000) / 1_000
+                _uptime.value = "%02d:%02d:%02d".format(h, m, s)
+                delay(1_000)
+            }
+        }
+    }
+
+    private fun stopUptimeTimer() {
+        uptimeJob?.cancel()
+        uptimeJob = null
+        _uptime.value = "--:--:--"
+    }
+
+    fun updateBlocklist() {
+        if (_downloadState.value is DownloadState.Loading) return
+        viewModelScope.launch {
+            try {
+                _downloadState.value  = DownloadState.Loading(0)
+                _downloadStatus.value = ""
+                repository.downloadAllAndUpdate(
+                    onProgress = { progress -> _downloadState.value = DownloadState.Loading(progress) },
+                    onStatus   = { status   -> _downloadStatus.value = status }
+                )
+                _domainCount.value    = repository.domainCount
+                _lastUpdate.value     = repository.lastUpdateFormatted
+                _downloadState.value  = DownloadState.Success
+                _downloadStatus.value = ""
+            } catch (e: Exception) {
+                _downloadState.value  = DownloadState.Error(e.message ?: "Erro desconhecido")
+                _downloadStatus.value = ""
+            }
+        }
+    }
+
+    fun dismissError() {
+        _downloadState.value = DownloadState.Idle
+    }
+
+    fun notifyAutoStartNeeded() { _autoStartHint.value = true }
+    fun dismissAutoStartHint()  { _autoStartHint.value = false }
+}
