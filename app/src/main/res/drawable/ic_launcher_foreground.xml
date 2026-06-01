@@ -1,37 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Adaptive icon foreground — Opção A (spec: viewBox 0 0 100 100, scaled to 108×108)
-  Safe area ~18% → conteúdo seguro entre 19–89dp
-  Escudo verde sólido + checkmark preto recortado + brackets verdes nos cantos
+  Adaptive icon foreground — Opção A spec, escala 0.75× centrada em (54,54)
+  Viewport 108×108dp.  Conteúdo seguro: 22..86dp (zona segura ~20%).
+  0.75× do SVG 100×100 centrado em (50,52) → mapeado para (54,54) em 108×108.
+  Resultados: escudo 54×66dp · checkmark proporcional · brackets no range 24..84
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="100"
-    android:viewportHeight="100">
+    android:viewportWidth="108"
+    android:viewportHeight="108">
 
-    <!-- Corner brackets -->
+    <!-- Corner brackets @ 0.75× -->
     <path
         android:fillColor="#00000000"
         android:strokeColor="#00FF66"
         android:strokeWidth="2.5"
-        android:pathData="M10 18 L10 10 L18 10
-                          M82 10 L90 10 L90 18
-                          M10 82 L10 90 L18 90
-                          M82 90 L90 90 L90 82"/>
+        android:pathData="M24,30 L24,24 L30,24
+                          M78,24 L84,24 L84,30
+                          M24,78 L24,84 L30,84
+                          M78,84 L84,84 L84,78"/>
 
-    <!-- Shield — solid green fill -->
+    <!-- Shield solid green @ 0.75× -->
     <path
         android:fillColor="#00FF66"
-        android:pathData="M50 8 L86 22 L86 54 Q86 80 50 96 Q14 80 14 54 L14 22 Z"/>
+        android:pathData="M54,21 L81,31 L81,55 Q81,75 54,87 Q27,75 27,55 L27,31 Z"/>
 
-    <!-- Checkmark — black cutout over shield -->
+    <!-- Checkmark black @ 0.75× -->
     <path
         android:fillColor="#00000000"
         android:strokeColor="#000000"
-        android:strokeWidth="6"
+        android:strokeWidth="5"
         android:strokeLineCap="square"
         android:strokeLineJoin="miter"
-        android:pathData="M33 52 L46 64 L70 40"/>
+        android:pathData="M41,54 L51,63 L69,45"/>
 
 </vector>

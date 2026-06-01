@@ -144,14 +144,15 @@ fun MainScreen(
                     )
                 }
         ) {
-            // ── Top content ──────────────────────────────────────────────────
+            // Single column — weight(1f) spacer empurra os botões para baixo
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxSize()
                     .padding(horizontal = 24.dp)
                     .padding(top = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // ── Top content ──────────────────────────────────────────────
                 BrandHeader(isActive = isActive)
                 Spacer(Modifier.height(32.dp))
                 ShieldArt(
@@ -163,16 +164,11 @@ fun MainScreen(
                 StatusPill(isActive = isActive)
                 Spacer(Modifier.height(20.dp))
                 MetaLine(domainCount = domainCount, uptime = uptime, isActive = isActive)
-            }
 
-            // ── Buttons — 140dp above screen base ────────────────────────────
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = 140.dp)
-            ) {
+                // ── Spacer empurra para ~20% acima da base ───────────────────
+                Spacer(modifier = Modifier.weight(1f))
+
+                // ── Buttons ──────────────────────────────────────────────────
                 MainToggleButton(
                     isActive = isActive,
                     onClick  = { onVpnToggle(state) }
@@ -198,22 +194,21 @@ fun MainScreen(
                     downloadStatus = downloadStatus,
                     onClick        = { viewModel.updateBlocklist() }
                 )
-            }
 
-            // ── Footer — at screen base ───────────────────────────────────────
-            Text(
-                text          = "ÚLT. ATT $lastUpdate",
-                fontFamily    = JBMono,
-                fontWeight    = FontWeight.Normal,
-                fontSize      = 9.sp,
-                letterSpacing = 1.sp,
-                color         = TxtDim,
-                textAlign     = TextAlign.Center,
-                modifier      = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp)
-            )
+                // ── Footer ───────────────────────────────────────────────────
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    text          = "ÚLT. ATT $lastUpdate",
+                    fontFamily    = JBMono,
+                    fontWeight    = FontWeight.Normal,
+                    fontSize      = 9.sp,
+                    letterSpacing = 1.sp,
+                    color         = TxtDim,
+                    textAlign     = TextAlign.Center,
+                    modifier      = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(28.dp))
+            }
         }
     }
 }

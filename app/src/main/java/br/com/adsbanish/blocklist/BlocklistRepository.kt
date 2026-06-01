@@ -131,11 +131,15 @@ class BlocklistRepository(private val context: Context) {
         if (allDomains.isEmpty())
             throw Exception("Nenhuma lista pôde ser baixada. Verifique sua conexão.")
 
-        // Salva conjunto mesclado em formato hosts
+        // Mescla com o set existente: re-download parcial nunca reduz a contagem
+        val merged = HashSet<String>(_domains)
+        merged.addAll(allDomains)
+
+        // Salva em formato hosts
         val tempFile = File(context.filesDir, "blocklist_tmp.txt")
         try {
             tempFile.bufferedWriter().use { writer ->
-                for (domain in allDomains) {
+                for (domain in merged) {
                     writer.write("0.0.0.0 $domain")
                     writer.newLine()
                 }
@@ -147,10 +151,10 @@ class BlocklistRepository(private val context: Context) {
 
         prefs.edit()
             .putLong(KEY_LAST_UPDATE, System.currentTimeMillis())
-            .putInt(KEY_DOMAIN_COUNT, allDomains.size)
+            .putInt(KEY_DOMAIN_COUNT, merged.size)
             .apply()
 
-        _domains = allDomains
+        _domains = merged
         onProgress(100)
     }
 

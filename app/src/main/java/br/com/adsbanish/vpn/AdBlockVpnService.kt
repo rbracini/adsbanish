@@ -27,6 +27,8 @@ class AdBlockVpnService : VpnService() {
         private val _state = MutableStateFlow<VpnState>(VpnState.Inactive)
         val state: StateFlow<VpnState> = _state
 
+        @Volatile var startTimeMs: Long = 0L
+
         // Referência à instância ativa — permite chamar stopSelf() diretamente sem IPC
         @Volatile private var instance: AdBlockVpnService? = null
 
@@ -86,6 +88,7 @@ class AdBlockVpnService : VpnService() {
                 .establish() ?: throw IllegalStateException("Falha ao criar interface VPN")
 
             tunInterface = tun
+            startTimeMs  = System.currentTimeMillis()
             _state.value = VpnState.Active
             Log.d("ADSBanish", "onStartCommand: VPN estabelecida, estado=Active")
 
@@ -110,7 +113,8 @@ class AdBlockVpnService : VpnService() {
 
     override fun onDestroy() {
         Log.d("ADSBanish", "onDestroy: serviço sendo destruído")
-        instance = null
+        instance    = null
+        startTimeMs = 0L
         scope.cancel()
         tunInterface?.close()
         tunInterface = null

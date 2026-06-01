@@ -55,10 +55,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startUptimeTimer() {
         uptimeJob?.cancel()
-        val startMs = System.currentTimeMillis()
         uptimeJob = viewModelScope.launch {
             while (isActive) {
-                val sec = (System.currentTimeMillis() - startMs) / 1_000
+                val t0  = AdBlockVpnService.startTimeMs
+                val sec = if (t0 > 0L) (System.currentTimeMillis() - t0) / 1_000 else 0L
                 _uptime.value = formatUptime(sec)
                 delay(1_000)
             }
