@@ -13,7 +13,7 @@ import java.util.*
 class BlocklistRepository(private val context: Context) {
 
     companion object {
-        private const val PREFS_NAME       = "adblocker_prefs"
+        const val PREFS_NAME       = "adblocker_prefs"
         private const val KEY_LAST_UPDATE  = "last_update_ts"
         private const val KEY_DOMAIN_COUNT = "domain_count"
         private const val BLOCKLIST_FILE   = "blocklist.txt"
@@ -75,7 +75,6 @@ class BlocklistRepository(private val context: Context) {
     private val blocklistFile: File = File(context.filesDir, BLOCKLIST_FILE)
 
     private var _domains: Set<String> = emptySet()
-    val domains: Set<String> get() = _domains
 
     val lastUpdateTimestamp: Long
         get() = prefs.getLong(KEY_LAST_UPDATE, 0L)
@@ -134,14 +133,17 @@ class BlocklistRepository(private val context: Context) {
 
         // Salva conjunto mesclado em formato hosts
         val tempFile = File(context.filesDir, "blocklist_tmp.txt")
-        tempFile.bufferedWriter().use { writer ->
-            for (domain in allDomains) {
-                writer.write("0.0.0.0 $domain")
-                writer.newLine()
+        try {
+            tempFile.bufferedWriter().use { writer ->
+                for (domain in allDomains) {
+                    writer.write("0.0.0.0 $domain")
+                    writer.newLine()
+                }
             }
+            tempFile.copyTo(blocklistFile, overwrite = true)
+        } finally {
+            tempFile.delete()
         }
-        tempFile.copyTo(blocklistFile, overwrite = true)
-        tempFile.delete()
 
         prefs.edit()
             .putLong(KEY_LAST_UPDATE, System.currentTimeMillis())
@@ -188,8 +190,8 @@ class BlocklistRepository(private val context: Context) {
         BlocklistParser.parseAdblockFile(lines)
 
     fun isBlocked(domain: String): Boolean {
-        if (_domains.isEmpty()) return BlocklistData.isBlocked(domain)
-        return BlocklistParser.isBlocked(domain, _domains, ALLOWLIST)
+        val list = if (_domains.isEmpty()) BlocklistData.BLOCKED_DOMAINS else _domains
+        return BlocklistParser.isBlocked(domain, list, ALLOWLIST)
     }
 
 }

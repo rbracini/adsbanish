@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import br.com.adsbanish.blocklist.BlocklistRepository
 import br.com.adsbanish.ui.theme.ADSBanishTheme
 import br.com.adsbanish.vpn.AdBlockVpnService
 import br.com.adsbanish.vpn.VpnState
@@ -41,8 +42,8 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // Fallback: se o VPN deveria estar ativo (flag salva) mas não está, reinicia automaticamente.
         // Cobre casos onde o BootReceiver foi bloqueado pelo sistema/OEM.
-        val prefs = getSharedPreferences("adblocker_prefs", Context.MODE_PRIVATE)
-        val shouldBeActive = prefs.getBoolean("vpn_enabled", false)
+        val prefs = getSharedPreferences(BlocklistRepository.PREFS_NAME, Context.MODE_PRIVATE)
+        val shouldBeActive = prefs.getBoolean(AdBlockVpnService.KEY_VPN_ENABLED, false)
         val isActive = AdBlockVpnService.state.value is VpnState.Active
         if (shouldBeActive && !isActive) {
             Log.d("ADSBanish", "onResume: VPN deveria estar ativa — reiniciando")
@@ -56,8 +57,8 @@ class MainActivity : ComponentActivity() {
         when (currentState) {
             is VpnState.Active -> {
                 Log.d("ADSBanish", "handleVpnToggle: branch ACTIVE -> solicitando parada")
-                getSharedPreferences("adblocker_prefs", Context.MODE_PRIVATE)
-                    .edit().putBoolean("vpn_enabled", false).apply()
+                getSharedPreferences(BlocklistRepository.PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit().putBoolean(AdBlockVpnService.KEY_VPN_ENABLED, false).apply()
                 AdBlockVpnService.requestStop()
                 Log.d("ADSBanish", "handleVpnToggle: requestStop() chamado")
             }

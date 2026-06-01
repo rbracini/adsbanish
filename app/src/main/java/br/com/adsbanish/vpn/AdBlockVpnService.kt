@@ -12,6 +12,7 @@ import androidx.core.app.ServiceCompat
 import br.com.adsbanish.App
 import br.com.adsbanish.R
 import br.com.adsbanish.blocklist.BlocklistRepository
+import br.com.adsbanish.blocklist.BlocklistRepository.Companion.PREFS_NAME
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,8 +22,7 @@ class AdBlockVpnService : VpnService() {
     companion object {
         private const val CHANNEL_ID      = "adblocker_vpn"
         private const val NOTIFICATION_ID = 1
-        private const val PREFS_NAME      = "adblocker_prefs"
-        private const val KEY_VPN_ENABLED = "vpn_enabled"
+        const val KEY_VPN_ENABLED = "vpn_enabled"
 
         private val _state = MutableStateFlow<VpnState>(VpnState.Inactive)
         val state: StateFlow<VpnState> = _state

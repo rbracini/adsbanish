@@ -2,6 +2,7 @@ package br.com.adsbanish.vpn
 
 import android.net.VpnService
 import android.util.Log
+import br.com.adsbanish.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
@@ -37,7 +38,7 @@ class PacketProcessor(
         val firstByte      = packet.get(0).toInt() and 0xFF
         val ipVersion      = firstByte shr 4
         if (ipVersion != 4) {
-            Log.v("DNS-RAW", "pacote IPv${ipVersion} ignorado (${length}b)")
+            if (BuildConfig.DEBUG) Log.v("DNS-RAW", "pacote IPv${ipVersion} ignorado (${length}b)")
             forwardRaw(packet.array(), length, output); return
         }
 
@@ -51,7 +52,7 @@ class PacketProcessor(
         val srcPort   = (packet.get(udpOffset).toInt()     and 0xFF shl 8) or
                         (packet.get(udpOffset + 1).toInt() and 0xFF)
 
-        Log.v("DNS-RAW", "$protoName src=$srcPort dst=$dstPort len=$length")
+        if (BuildConfig.DEBUG) Log.v("DNS-RAW", "$protoName src=$srcPort dst=$dstPort len=$length")
 
         if (protocol != 17) { forwardRaw(packet.array(), length, output); return }
         if (dstPort != dnsPort) { forwardRaw(packet.array(), length, output); return }
@@ -69,7 +70,7 @@ class PacketProcessor(
             val nxResp = DnsPacket.buildNxdomainResponse(dnsPacket)
             writeUdpResponse(packet.array().copyOfRange(0, ipHeaderLength), dnsPort, srcPort, nxResp, output)
         } else {
-            Log.d("DNS-ALLOW", "permitido: $domain")
+            if (BuildConfig.DEBUG) Log.d("DNS-ALLOW", "permitido: $domain")
             forwardDnsQuery(domain, dnsData, udpPayloadLength, srcPort, packet.array(), ipHeaderLength, output)
         }
     }
