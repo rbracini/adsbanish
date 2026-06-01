@@ -1,28 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Adaptive icon foreground — exactly matches ADS Banish Icon.html spec.
-  Viewport 108×108dp. Background = black (ic_launcher_background.xml).
-  Shield and checkmark scaled from SVG spec (icon 300×300, scale=0.36).
-  No brackets — clean design per spec.
--->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-
-    <!-- Shield solid green — from spec: M600,300 L708,342 L708,438 Q708,516 600,558 Q492,516 492,438 L492,342 Z -->
+    <!-- Escudo ADS Banish — verde, centralizado na zona segura de 66dp -->
     <path
         android:fillColor="#00FF66"
-        android:pathData="M54,18 L93,33 L93,68 Q93,96 54,111 Q15,96 15,68 L15,33 Z"/>
-
-    <!-- Checkmark black — from spec: M551,426 L590,465 L662,393, stroke-width=18 -->
+        android:pathData="M54,24 L78,34 L78,56 Q78,74 54,84 Q30,74 30,56 L30,34 Z" />
+    <!-- Check recortado em preto -->
     <path
-        android:fillColor="#00000000"
         android:strokeColor="#000000"
-        android:strokeWidth="6.5"
+        android:strokeWidth="7"
         android:strokeLineCap="square"
         android:strokeLineJoin="miter"
-        android:pathData="M36,63 L50,77 L76,52"/>
-
+        android:pathData="M42,56 L51,65 L68,45" />
 </vector>
