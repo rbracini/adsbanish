@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -16,6 +17,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -33,6 +37,7 @@ import android.net.Uri
 import android.provider.Settings
 import br.com.adsbanish.BuildConfig
 import br.com.adsbanish.R
+import br.com.adsbanish.blocklist.BlocklistSource
 import br.com.adsbanish.vpn.VpnState
 import kotlinx.coroutines.flow.StateFlow
 import java.text.NumberFormat
@@ -65,23 +70,38 @@ fun MainScreen(
     viewModel   : MainViewModel,
     onVpnToggle : (VpnState) -> Unit
 ) {
-    val state          by vpnState.collectAsState()
-    val downloadState  by viewModel.downloadState.collectAsState()
-    val downloadStatus by viewModel.downloadStatus.collectAsState()
-    val domainCount    by viewModel.domainCount.collectAsState()
-    val lastUpdate     by viewModel.lastUpdate.collectAsState()
-    val uptime         by viewModel.uptime.collectAsState()
-    val autoStartHint  by viewModel.autoStartHint.collectAsState()
+    val state             by vpnState.collectAsState()
+    val downloadState     by viewModel.downloadState.collectAsState()
+    val downloadStatus    by viewModel.downloadStatus.collectAsState()
+    val domainCount       by viewModel.domainCount.collectAsState()
+    val lastUpdate        by viewModel.lastUpdate.collectAsState()
+    val uptime            by viewModel.uptime.collectAsState()
+    val autoStartHint     by viewModel.autoStartHint.collectAsState()
+    val sourcesEnabled    by viewModel.sourcesEnabled.collectAsState()
+    val sourceDomainCounts by viewModel.sourceDomainCounts.collectAsState()
 
     val isActive      = state is VpnState.Active
     val isDownloading = downloadState is DownloadState.Loading
 
     var showHelpDialog     by remember { mutableStateOf(false) }
     var showDownloadDialog by remember { mutableStateOf(false) }
+    var showSourcesDialog  by remember { mutableStateOf(false) }
+    var firstActivation    by rememberSaveable { mutableStateOf(false) }
 
-    // Auto-show download dialog when download starts (survives recomposition)
     LaunchedEffect(downloadState) {
         if (downloadState is DownloadState.Loading) showDownloadDialog = true
+        if (firstActivation) {
+            when (downloadState) {
+                is DownloadState.Success -> {
+                    firstActivation    = false
+                    showDownloadDialog = false
+                    viewModel.dismissDownload()
+                    onVpnToggle(state)
+                }
+                is DownloadState.Error -> firstActivation = false
+                else -> Unit
+            }
+        }
     }
 
     val inf = rememberInfiniteTransition(label = "anim")
@@ -114,12 +134,26 @@ fun MainScreen(
         HelpDialog(onDismiss = { showHelpDialog = false })
     }
 
+    if (showSourcesDialog) {
+        SourcesDialog(
+            sourcesEnabled     = sourcesEnabled,
+            sourceDomainCounts = sourceDomainCounts,
+            isEditable         = viewModel.hasDownloadedList,
+            onToggle           = { source, enabled -> viewModel.toggleSource(source, enabled) },
+            onDismiss          = {
+                showSourcesDialog = false
+                viewModel.refreshDomainCount()
+            }
+        )
+    }
+
     if (showDownloadDialog) {
         DownloadDialog(
-            downloadState  = downloadState,
-            downloadStatus = downloadStatus,
-            domainCount    = domainCount,
-            onDismiss      = {
+            downloadState   = downloadState,
+            downloadStatus  = downloadStatus,
+            domainCount     = domainCount,
+            firstActivation = firstActivation,
+            onDismiss       = {
                 showDownloadDialog = false
                 viewModel.dismissDownload()
             }
@@ -161,7 +195,11 @@ fun MainScreen(
                 .padding(top = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            BrandHeader(isActive = isActive, onHelpClick = { showHelpDialog = true })
+            BrandHeader(
+                isActive    = isActive,
+                onHelpClick = { showHelpDialog = true },
+                onMenuClick = { showSourcesDialog = true }
+            )
             Spacer(Modifier.height(32.dp))
             ShieldArt(
                 isActive     = isActive,
@@ -175,7 +213,18 @@ fun MainScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            MainToggleButton(isActive = isActive, onClick = { onVpnToggle(state) })
+            MainToggleButton(
+                isActive = isActive,
+                onClick  = {
+                    if (!isActive && !viewModel.hasDownloadedList) {
+                        firstActivation = true
+                        viewModel.updateBlocklist()
+                        showDownloadDialog = true
+                    } else {
+                        onVpnToggle(state)
+                    }
+                }
+            )
             Spacer(Modifier.height(12.dp))
 
             if (autoStartHint) {
@@ -219,7 +268,7 @@ fun MainScreen(
 
 // ── BrandHeader ───────────────────────────────────────────────────────────────
 @Composable
-private fun BrandHeader(isActive: Boolean, onHelpClick: () -> Unit) {
+private fun BrandHeader(isActive: Boolean, onHelpClick: () -> Unit, onMenuClick: () -> Unit) {
     Row(
         modifier              = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -237,9 +286,19 @@ private fun BrandHeader(isActive: Boolean, onHelpClick: () -> Unit) {
         )
         Row(
             verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Help button
+            Text(
+                text     = "≡",
+                fontFamily    = JBMono,
+                fontWeight    = FontWeight.Bold,
+                fontSize      = 13.sp,
+                color         = TxtDim,
+                modifier      = Modifier
+                    .clickable(onClick = onMenuClick)
+                    .border(1.dp, TxtDim)
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            )
             Text(
                 text          = "?",
                 fontFamily    = JBMono,
@@ -250,22 +309,6 @@ private fun BrandHeader(isActive: Boolean, onHelpClick: () -> Unit) {
                     .clickable(onClick = onHelpClick)
                     .border(1.dp, TxtDim)
                     .padding(horizontal = 6.dp, vertical = 2.dp)
-            )
-            Text(
-                text          = if (isActive) "live" else "idle",
-                fontFamily    = JBMono,
-                fontWeight    = FontWeight.Medium,
-                fontSize      = 11.sp,
-                letterSpacing = 2.sp,
-                color         = if (isActive) Green else TxtDim
-            )
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .then(
-                        if (isActive) Modifier.background(Green)
-                        else Modifier.border(1.5.dp, TxtDim)
-                    )
             )
         }
     }
@@ -389,7 +432,7 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
                     text       = if (isActive) "STATUS:OK" else "STATUS:--",
                     fontFamily = JBMono,
                     fontWeight = FontWeight.Medium,
-                    fontSize   = 7.sp,
+                    fontSize   = 8.sp,
                     color      = if (isActive) Green else TxtDim
                 )
                 if (isActive) {
@@ -405,7 +448,7 @@ private fun ShieldArt(isActive: Boolean, scanFraction: Float, cursorAlpha: Float
             Text(
                 text       = "v${BuildConfig.VERSION_NAME}",
                 fontFamily = JBMono,
-                fontWeight = FontWeight.Normal,
+                fontWeight = FontWeight.Bold,
                 fontSize   = 8.sp,
                 color      = TxtDim,
                 modifier   = Modifier.align(Alignment.BottomEnd).padding(end = 14.dp, bottom = 7.dp)
@@ -460,11 +503,11 @@ private fun MetaLine(domainCount: Int, uptime: String, isActive: Boolean) {
                 color      = TxtHi
             )
             Text(
-                text          = "DOMÍNIOS",
+                text          = "DOMÍNIOS ATIVOS",
                 fontFamily    = JBMono,
                 fontWeight    = FontWeight.Normal,
                 fontSize      = 9.sp,
-                letterSpacing = 1.5.sp,
+                letterSpacing = 0.5.sp,
                 color         = TxtDim
             )
         }
@@ -673,10 +716,11 @@ private fun UpdateButton(isDownloading: Boolean, onClick: () -> Unit) {
 // ── DownloadDialog ────────────────────────────────────────────────────────────
 @Composable
 private fun DownloadDialog(
-    downloadState  : DownloadState,
-    downloadStatus : String,
-    domainCount    : Int,
-    onDismiss      : () -> Unit
+    downloadState   : DownloadState,
+    downloadStatus  : String,
+    domainCount     : Int,
+    firstActivation : Boolean = false,
+    onDismiss       : () -> Unit
 ) {
     val isLoading = downloadState is DownloadState.Loading
     val isError   = downloadState is DownloadState.Error
@@ -688,7 +732,6 @@ private fun DownloadDialog(
         properties = DialogProperties(dismissOnClickOutside = false, dismissOnBackPress = !isLoading)
     ) {
         Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-            // Hard shadow
             Box(
                 modifier = Modifier
                     .offset(4.dp, 4.dp)
@@ -707,7 +750,7 @@ private fun DownloadDialog(
                     text = when {
                         isError   -> "ERRO NA ATUALIZAÇÃO"
                         isSuccess -> "LISTA ATUALIZADA"
-                        else      -> "ATUALIZANDO LISTA"
+                        else      -> "BAIXANDO LISTA"
                     },
                     fontFamily    = JBMono,
                     fontWeight    = FontWeight.ExtraBold,
@@ -715,6 +758,16 @@ private fun DownloadDialog(
                     letterSpacing = 2.sp,
                     color         = accent
                 )
+
+                if (firstActivation && isLoading) {
+                    Text(
+                        text       = "Antes de ativar é necessário baixar a lista",
+                        fontFamily = JBMono,
+                        fontWeight = FontWeight.Normal,
+                        fontSize   = 11.sp,
+                        color      = TxtMid
+                    )
+                }
 
                 when {
                     isLoading -> {
@@ -788,18 +841,158 @@ private fun DownloadDialog(
     }
 }
 
-// ── HelpDialog ────────────────────────────────────────────────────────────────
+// ── SourcesDialog ─────────────────────────────────────────────────────────────
 @Composable
-private fun HelpDialog(onDismiss: () -> Unit) {
+private fun SourcesDialog(
+    sourcesEnabled     : Map<BlocklistSource, Boolean>,
+    sourceDomainCounts : Map<BlocklistSource, Int>,
+    isEditable         : Boolean,
+    onToggle           : (BlocklistSource, Boolean) -> Unit,
+    onDismiss          : () -> Unit
+) {
+    val maxH = (LocalConfiguration.current.screenHeightDp * 0.88f).dp
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(dismissOnClickOutside = true)
     ) {
-        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = maxH)
+                .padding(horizontal = 8.dp)
+        ) {
+            Box(Modifier.offset(4.dp, 4.dp).matchParentSize().background(Green))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Surface)
+                    .border(2.dp, Green)
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
+            ) {
+                Text(
+                    text          = "FONTES DE BLOQUEIO",
+                    fontFamily    = JBMono,
+                    fontWeight    = FontWeight.ExtraBold,
+                    fontSize      = 13.sp,
+                    letterSpacing = 2.sp,
+                    color         = Green
+                )
+                Spacer(Modifier.height(12.dp))
+
+                if (!isEditable) {
+                    Text(
+                        text          = "Baixe a lista antes de alterar as fontes",
+                        fontFamily    = JBMono,
+                        fontWeight    = FontWeight.Normal,
+                        fontSize      = 9.sp,
+                        color         = TxtDim,
+                        modifier      = Modifier.padding(bottom = 4.dp)
+                    )
+                }
+
+                BlocklistSource.entries.forEachIndexed { index, source ->
+                    if (index > 0) {
+                        Box(Modifier.fillMaxWidth().height(1.dp).background(Border))
+                    }
+                    SourceRow(
+                        source      = source,
+                        enabled     = sourcesEnabled[source] ?: true,
+                        isEditable  = isEditable,
+                        domainCount = sourceDomainCounts[source] ?: 0,
+                        onToggle    = { onToggle(source, it) }
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick  = onDismiss,
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    shape    = RectangleShape,
+                    border   = BorderStroke(2.dp, Green),
+                    colors   = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Bg,
+                        contentColor   = Green
+                    )
+                ) {
+                    Text(
+                        text          = "OK",
+                        fontFamily    = JBMono,
+                        fontWeight    = FontWeight.ExtraBold,
+                        fontSize      = 13.sp,
+                        letterSpacing = 3.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourceRow(
+    source      : BlocklistSource,
+    enabled     : Boolean,
+    isEditable  : Boolean,
+    domainCount : Int,
+    onToggle    : (Boolean) -> Unit
+) {
+    val nameColor   = when { !isEditable -> TxtDim; enabled -> TxtHi; else -> TxtDim }
+    val toggleColor = when { !isEditable -> TxtDim; enabled -> Green; else -> TxtDim }
+
+    Row(
+        modifier          = Modifier
+            .fillMaxWidth()
+            .then(if (isEditable) Modifier.clickable { onToggle(!enabled) } else Modifier)
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text       = source.displayName,
+                fontFamily = JBMono,
+                fontWeight = FontWeight.SemiBold,
+                fontSize   = 11.sp,
+                color      = nameColor
+            )
+            Text(
+                text       = source.description,
+                fontFamily = JBMono,
+                fontWeight = FontWeight.Normal,
+                fontSize   = 9.sp,
+                color      = TxtDim
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text          = if (enabled) "[ON ]" else "[OFF]",
+            fontFamily    = JBMono,
+            fontWeight    = FontWeight.Bold,
+            fontSize      = 10.sp,
+            letterSpacing = 1.sp,
+            color         = toggleColor
+        )
+    }
+}
+
+// ── HelpDialog ────────────────────────────────────────────────────────────────
+@Composable
+private fun HelpDialog(onDismiss: () -> Unit) {
+    val maxH = (LocalConfiguration.current.screenHeightDp * 0.88f).dp
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(dismissOnClickOutside = true)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = maxH)
+                .padding(horizontal = 8.dp)
+        ) {
             Box(
                 modifier = Modifier
                     .offset(4.dp, 4.dp)
-                    .fillMaxWidth()
+                    .matchParentSize()
                     .background(Green)
             )
             Column(
@@ -807,7 +1000,8 @@ private fun HelpDialog(onDismiss: () -> Unit) {
                     .fillMaxWidth()
                     .background(Surface)
                     .border(2.dp, Green)
-                    .padding(20.dp),
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
@@ -821,19 +1015,23 @@ private fun HelpDialog(onDismiss: () -> Unit) {
 
                 HelpSection(
                     title = "[ ATIVAR / DESATIVAR ]",
-                    body  = "Toque no botão principal para ligar ou desligar o bloqueio. O app cria uma VPN local — nenhum dado sai do dispositivo."
+                    body  = "Toque no botão principal para ligar ou desligar o bloqueio. Na primeira ativação o app baixa as listas automaticamente. O bloqueio usa uma VPN local — nenhum dado sai do dispositivo."
+                )
+                HelpSection(
+                    title = "[ FONTES DE BLOQUEIO ]",
+                    body  = "Toque em [≡] para ver e ativar/desativar cada lista individualmente. Útil para liberar domínios bloqueados por listas mais agressivas sem desativar tudo."
                 )
                 HelpSection(
                     title = "[ ATUALIZAR LISTA ]",
-                    body  = "Baixa listas atualizadas de domínios de anúncios e rastreadores de múltiplas fontes. Faça ao instalar e mensalmente."
+                    body  = "Baixa as versões mais recentes de todas as listas ativas. Recomendado ao instalar e mensalmente para manter a proteção atualizada."
                 )
                 HelpSection(
                     title = "[ AUTO-START ]",
-                    body  = "Para iniciar automaticamente após reiniciar:\nConfig. → Apps → ADSBanish → Bateria → Sem restrições (ou Irrestrito)"
+                    body  = "Para ativar automaticamente após reiniciar:\nConfig. → Apps → ADSBanish → Bateria → Sem restrições (ou Irrestrito)"
                 )
                 HelpSection(
                     title = "[ COMO FUNCIONA ]",
-                    body  = "Intercepta consultas DNS e bloqueia domínios de anúncios e rastreadores. ${"±"}316 mil domínios bloqueados por padrão."
+                    body  = "Intercepta consultas DNS e bloqueia domínios de anúncios, rastreadores e malware. Sites e serviços legítimos (Google, WhatsApp, bancos…) nunca são bloqueados."
                 )
 
                 OutlinedButton(

@@ -30,7 +30,11 @@ class PacketProcessor(
         while (isActive) {
             val length = try { input.read(buffer) } catch (e: Exception) { break }
             if (length <= 0) continue
-            processIpPacket(ByteBuffer.wrap(buffer, 0, length), length, output)
+            try {
+                processIpPacket(ByteBuffer.wrap(buffer, 0, length), length, output)
+            } catch (e: Exception) {
+                Log.e("PacketProcessor", "erro ao processar pacote: ${e.message}")
+            }
         }
     }
 

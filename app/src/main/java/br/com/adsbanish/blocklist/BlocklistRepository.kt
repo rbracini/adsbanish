@@ -7,20 +7,24 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
-import java.text.SimpleDateFormat
-import java.util.*
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 class BlocklistRepository(private val context: Context) {
 
     companion object {
-        const val PREFS_NAME       = "adblocker_prefs"
-        private const val KEY_LAST_UPDATE  = "last_update_ts"
-        private const val KEY_DOMAIN_COUNT = "domain_count"
-        private const val BLOCKLIST_FILE   = "blocklist.txt"
-        private const val TIMEOUT_MS       = 30_000
-        val DATE_FORMAT = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+        const val PREFS_NAME                 = "adblocker_prefs"
+        private const val KEY_LAST_UPDATE    = "last_update_ts"
+        private const val KEY_DOMAIN_COUNT   = "domain_count"
+        private const val KEY_SOURCE_ENABLED = "source_enabled_"
+        private const val KEY_SOURCE_COUNT   = "source_count_"
+        private const val BLOCKLIST_FILE     = "blocklist.txt"
+        private const val TIMEOUT_MS         = 30_000
+        private val dateFormatter: DateTimeFormatter = DateTimeFormatter
+            .ofPattern("dd/MM/yyyy HH:mm")
+            .withZone(ZoneId.systemDefault())
 
-        // Domínios sempre permitidos — têm prioridade sobre qualquer lista de bloqueio
         val ALLOWLIST: Set<String> = setOf(
             // YouTube
             "youtube.com", "youtu.be", "googlevideo.com", "ytimg.com",
@@ -66,6 +70,12 @@ class BlocklistRepository(private val context: Context) {
             "airbnb.com", "booking.com",
             "wikipedia.org", "wikimedia.org",
             "github.com", "githubusercontent.com",
+            // Redirect de e-mail marketing legítimo (HubSpot, Mailchimp, SendGrid…)
+            // Bloquear esses domínios impede abrir links em newsletters
+            "hubspotlinks.com", "hs-analytics.net",
+            "list-manage.com", "mailchi.mp",
+            "sendgrid.net", "sendgrid.com",
+            "click.convertkit-mail.com", "convertkit.com",
         )
     }
 
@@ -74,39 +84,98 @@ class BlocklistRepository(private val context: Context) {
 
     private val blocklistFile: File = File(context.filesDir, BLOCKLIST_FILE)
 
-    private var _domains: Set<String> = emptySet()
+    @Volatile private var _domains: Set<String> = emptySet()
 
-    val lastUpdateTimestamp: Long
-        get() = prefs.getLong(KEY_LAST_UPDATE, 0L)
+    // Cache por fonte — permite rebuild sem I/O de disco ao togglear fontes
+    @Volatile private var perSourceDomains: Map<BlocklistSource, Set<String>> = emptyMap()
+
+    val activeDomainCount: Int get() = _domains.size
+
+    val lastUpdateTimestamp: Long get() = prefs.getLong(KEY_LAST_UPDATE, 0L)
 
     val lastUpdateFormatted: String
         get() = if (lastUpdateTimestamp == 0L) "Nunca"
-                else DATE_FORMAT.format(Date(lastUpdateTimestamp))
+                else dateFormatter.format(Instant.ofEpochMilli(lastUpdateTimestamp))
 
-    val domainCount: Int
-        get() = prefs.getInt(KEY_DOMAIN_COUNT, 0)
+    val domainCount: Int get() = prefs.getInt(KEY_DOMAIN_COUNT, 0)
 
     val hasLocalBlocklist: Boolean get() = blocklistFile.exists()
 
+    val hasDownloadedList: Boolean
+        get() = domainCount > 0 || hasLocalBlocklist || hasAnySourceFile()
+
+    // ── Per-source helpers ────────────────────────────────────────────────────
+
+    private fun sourceFile(source: BlocklistSource) =
+        File(context.filesDir, "blocklist_${source.name.lowercase()}.txt")
+
+    private fun hasAnySourceFile() =
+        BlocklistSource.entries.any { sourceFile(it).exists() }
+
+    fun isSourceEnabled(source: BlocklistSource): Boolean =
+        prefs.getBoolean(KEY_SOURCE_ENABLED + source.name, true)
+
+    fun getSourceDomainCount(source: BlocklistSource): Int =
+        prefs.getInt(KEY_SOURCE_COUNT + source.name, 0)
+
+    suspend fun setSourceEnabled(source: BlocklistSource, enabled: Boolean) =
+        withContext(Dispatchers.IO) {
+            prefs.edit().putBoolean(KEY_SOURCE_ENABLED + source.name, enabled).apply()
+            rebuildActiveDomains()
+        }
+
+    // ── Core loading ──────────────────────────────────────────────────────────
+
+    /**
+     * Mescla apenas as fontes habilitadas a partir do cache em memória (sem I/O).
+     * Quando o cache está vazio (pré-download), recai no BlocklistData embutido.
+     */
+    private suspend fun rebuildActiveDomains() = withContext(Dispatchers.IO) {
+        val cache = perSourceDomains
+        val merged = HashSet<String>()
+        for ((source, domains) in cache) {
+            if (isSourceEnabled(source)) merged.addAll(domains)
+        }
+        _domains = when {
+            merged.isNotEmpty() -> merged
+            cache.isEmpty()     -> BlocklistData.BLOCKED_DOMAINS
+            else                -> emptySet()
+        }
+        prefs.edit().putInt(KEY_DOMAIN_COUNT, _domains.size).apply()
+    }
+
     suspend fun loadIntoMemory() = withContext(Dispatchers.IO) {
-        _domains = if (hasLocalBlocklist) {
-            parseHostsFile(blocklistFile.readLines())
-        } else {
-            BlocklistData.BLOCKED_DOMAINS
+        when {
+            hasAnySourceFile() -> {
+                val cache = HashMap<BlocklistSource, Set<String>>()
+                for (source in BlocklistSource.entries) {
+                    val file = sourceFile(source)
+                    if (file.exists() && file.length() > 0) {
+                        cache[source] = parseHostsFile(file.readLines())
+                    }
+                }
+                perSourceDomains = cache
+                rebuildActiveDomains()
+            }
+            hasLocalBlocklist  -> {
+                // Arquivo legado de versão anterior — usado só até o primeiro update
+                _domains = parseHostsFile(blocklistFile.readLines())
+                prefs.edit().putInt(KEY_DOMAIN_COUNT, _domains.size).apply()
+            }
+            else -> _domains = BlocklistData.BLOCKED_DOMAINS
         }
     }
 
+    // ── Download ──────────────────────────────────────────────────────────────
+
     /**
-     * Baixa todas as fontes em sequência e mescla os domínios.
-     * Falhas individuais são ignoradas — continua com as demais fontes.
-     * [onProgress] 0..100 para o progresso geral.
-     * [onStatus] nome da fonte sendo baixada no momento.
+     * Baixa todas as fontes e salva cada uma em arquivo próprio (substituição, nunca acúmulo).
+     * Ao final reconstrói o conjunto ativo a partir das fontes habilitadas.
      */
     suspend fun downloadAllAndUpdate(
         onProgress: (Int) -> Unit = {},
         onStatus: (String) -> Unit = {}
     ) = withContext(Dispatchers.IO) {
-        val allDomains = HashSet<String>()
         val sources = BlocklistSource.entries
         var successCount = 0
 
@@ -118,45 +187,42 @@ class BlocklistRepository(private val context: Context) {
             onProgress(startPct)
 
             try {
-                val domains = downloadSource(source) { innerProgress ->
-                    onProgress(startPct + (innerProgress * (endPct - startPct)) / 100)
+                val domains = downloadSource(source) { inner ->
+                    onProgress(startPct + (inner * (endPct - startPct)) / 100)
                 }
-                allDomains.addAll(domains)
+                if (domains.size < 100)
+                    throw Exception("${source.displayName}: lista com dados insuficientes (${domains.size} domínios)")
+                val file = sourceFile(source)
+                val tmp  = File(context.filesDir, "blocklist_${source.name.lowercase()}_tmp.txt")
+                try {
+                    tmp.bufferedWriter().use { w ->
+                        for (d in domains) { w.write("0.0.0.0 $d"); w.newLine() }
+                    }
+                    if (!tmp.renameTo(file)) {
+                        tmp.copyTo(file, overwrite = true)
+                    }
+                } finally {
+                    if (tmp.exists()) tmp.delete()
+                }
+                perSourceDomains = perSourceDomains + (source to domains)
+                prefs.edit().putInt(KEY_SOURCE_COUNT + source.name, domains.size).apply()
                 successCount++
             } catch (_: Exception) {
-                // continua com a próxima fonte
+                // mantém arquivo da fonte já existente se o download falhar
             }
         }
 
-        if (allDomains.isEmpty())
+        if (successCount == 0 && !hasAnySourceFile())
             throw Exception("Nenhuma lista pôde ser baixada. Verifique sua conexão.")
 
-        // Mescla com o set existente: re-download parcial nunca reduz a contagem
-        val merged = HashSet<String>(_domains)
-        merged.addAll(allDomains)
-
-        // Salva em formato hosts
-        val tempFile = File(context.filesDir, "blocklist_tmp.txt")
-        try {
-            tempFile.bufferedWriter().use { writer ->
-                for (domain in merged) {
-                    writer.write("0.0.0.0 $domain")
-                    writer.newLine()
-                }
-            }
-            tempFile.copyTo(blocklistFile, overwrite = true)
-        } finally {
-            tempFile.delete()
+        rebuildActiveDomains()
+        if (successCount == sources.size) {
+            prefs.edit().putLong(KEY_LAST_UPDATE, System.currentTimeMillis()).apply()
         }
-
-        prefs.edit()
-            .putLong(KEY_LAST_UPDATE, System.currentTimeMillis())
-            .putInt(KEY_DOMAIN_COUNT, merged.size)
-            .apply()
-
-        _domains = merged
         onProgress(100)
     }
+
+    // ── Internals ─────────────────────────────────────────────────────────────
 
     private suspend fun downloadSource(
         source: BlocklistSource,
@@ -197,5 +263,4 @@ class BlocklistRepository(private val context: Context) {
         val list = if (_domains.isEmpty()) BlocklistData.BLOCKED_DOMAINS else _domains
         return BlocklistParser.isBlocked(domain, list, ALLOWLIST)
     }
-
 }

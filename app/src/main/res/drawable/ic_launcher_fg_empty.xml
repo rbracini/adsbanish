@@ -4,8 +4,7 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Fundo preto full-bleed: preenche qualquer máscara (círculo, squircle, etc.) -->
     <path
-        android:fillColor="#000000"
-        android:pathData="M0,0 H108 V108 H0 Z" />
+        android:pathData="M0,0 L108,0 L108,108 L0,108 Z"
+        android:fillColor="#00000000"/>
 </vector>

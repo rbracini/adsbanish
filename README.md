@@ -43,6 +43,19 @@ App Request → DNS Query → [ TUN Interface ]
 
 ---
 
+## `> SCREENSHOTS`
+
+<div align="center">
+
+| Proteção desativada | Proteção ativa |
+|:---:|:---:|
+| ![VPN off](docs/screenshots/vpn_off.png) | ![VPN on](docs/screenshots/vpn_on.png) |
+| `STATUS:--` · TRÁFEGO LIVRE | `STATUS:OK` · FILTRANDO TRÁFEGO |
+
+</div>
+
+---
+
 ## `> FEATURES`
 
 | Feature | Description |
@@ -67,7 +80,7 @@ App Request → DNS Query → [ TUN Interface ]
 ├──────────────────┼────────────┼─────────────────────────────────┤
 │  StevenBlack     │  ~150k     │  Ads + Malware + Tracking       │
 │  OISD Small      │  ~50k      │  Ads + Tracking (lightweight)   │
-│  OISD Big        │  ~300k     │  Ads + Tracking + Malware       │
+│  OISD Big        │  ~300k+    │  Ads + Tracking + Malware       │
 │  Peter Lowe      │  ~3k       │  Ads only (minimalist)          │
 │  AdGuard DNS     │  ~50k      │  Curated by AdGuard team        │
 └─────────────────────────────────────────────────────────────────┘
@@ -99,11 +112,12 @@ AdBlockVpnService                (foreground, VpnService)
 
 **Stack:**
 - Language: `Kotlin`
-- UI: `Jetpack Compose` + `JetBrains Mono` typeface
+- UI: `Jetpack Compose` + `JetBrains Mono` typeface · neobrutalismo dark theme
 - Async: `Kotlin Coroutines`
 - Networking: `HttpURLConnection` (zero third-party HTTP deps)
 - State: `StateFlow` / `AndroidViewModel`
 - Min SDK: `26` (Android 8.0) · Target SDK: `35`
+- Icon: adaptive icon (PNG foreground per density + vector black background) — safe zone compliant
 
 ---
 

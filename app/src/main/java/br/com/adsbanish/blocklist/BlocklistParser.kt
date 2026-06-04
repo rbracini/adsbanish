@@ -10,7 +10,7 @@ object BlocklistParser {
             val parts = trimmed.split("\\s+".toRegex())
             if (parts.size < 2) continue
             val ip = parts[0]
-            if (ip != "0.0.0.0" && ip != "127.0.0.1") continue
+            if (ip != "0.0.0.0" && ip != "127.0.0.1" && ip != "::1") continue
             val domain = parts[1].lowercase()
             if (domain == "localhost" || domain == "broadcasthost") continue
             result.add(domain)

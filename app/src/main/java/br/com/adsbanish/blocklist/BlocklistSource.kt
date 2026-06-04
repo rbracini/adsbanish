@@ -16,13 +16,13 @@ enum class BlocklistSource(
         displayName = "OISD Small",
         description = "~50k domínios — Ads + Tracking (leve)",
         url = "https://small.oisd.nl/",
-        format = BlocklistFormat.HOSTS
+        format = BlocklistFormat.ADBLOCK
     ),
     OISD_BIG(
         displayName = "OISD Big",
         description = "~300k domínios — Ads + Tracking + Malware (completo)",
         url = "https://big.oisd.nl/",
-        format = BlocklistFormat.HOSTS
+        format = BlocklistFormat.ADBLOCK
     ),
     PETER_LOWE(
         displayName = "Peter Lowe",
@@ -32,7 +32,7 @@ enum class BlocklistSource(
     ),
     ADGUARD(
         displayName = "AdGuard DNS",
-        description = "~50k domínios — Curado pelo AdGuard",
+        description = "~50k domínios — Rastreadores, phishing e malware (mais agressivo que OISD)",
         url = "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt",
         format = BlocklistFormat.ADBLOCK
     ),
