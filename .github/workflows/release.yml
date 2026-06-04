@@ -63,11 +63,6 @@ jobs:
           mv app/build/outputs/apk/release/app-release.apk \
              app/build/outputs/apk/release/adsbanish_v${{ steps.version.outputs.VERSION }}.apk
 
-      - name: Copy APK to release folder
-        run: |
-          cp app/build/outputs/apk/release/adsbanish_v${{ steps.version.outputs.VERSION }}.apk \
-             release/adsbanish_v${{ steps.version.outputs.VERSION }}.apk
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
