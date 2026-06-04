@@ -63,7 +63,7 @@ App Request → DNS Query → [ TUN Interface ]
 | `DNS interception` | Captures all UDP port 53 traffic via TUN interface |
 | `NXDOMAIN response` | Blocked domains receive a valid DNS refusal, not silence |
 | `HashSet O(1) lookup` | Millions of DNS queries per day, zero perceptible latency |
-| `5 blocklist sources` | StevenBlack, OISD Small/Big, Peter Lowe, AdGuard DNS |
+| `6 blocklist sources` | StevenBlack, OISD Small/Big, Peter Lowe, AdGuard DNS, StevenBlack Adult |
 | `Dual format parsing` | Supports `HOSTS` (`0.0.0.0 domain`) and `ADBLOCK` (`\|\|domain^`) |
 | `Safe download` | Writes to temp file first — current list never corrupted on failure |
 | `Hierarchy matching` | `sub.ads.example.com` → checks `sub`, `ads.example.com`, `example.com` |
@@ -76,13 +76,14 @@ App Request → DNS Query → [ TUN Interface ]
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  SOURCE          │  DOMAINS   │  FOCUS                          │
-├──────────────────┼────────────┼─────────────────────────────────┤
-│  StevenBlack     │  ~150k     │  Ads + Malware + Tracking       │
-│  OISD Small      │  ~50k      │  Ads + Tracking (lightweight)   │
-│  OISD Big        │  ~300k+    │  Ads + Tracking + Malware       │
-│  Peter Lowe      │  ~3k       │  Ads only (minimalist)          │
-│  AdGuard DNS     │  ~50k      │  Curated by AdGuard team        │
+│  SOURCE               │  DOMAINS   │  FOCUS                     │
+├───────────────────────┼────────────┼────────────────────────────┤
+│  StevenBlack          │  ~150k     │  Ads + Malware + Tracking  │
+│  OISD Small           │  ~50k      │  Ads + Tracking            │
+│  OISD Big             │  ~300k+    │  Ads + Tracking + Malware  │
+│  Peter Lowe           │  ~3k       │  Ads only (minimalist)     │
+│  AdGuard DNS          │  ~50k      │  Trackers + Phishing       │
+│  StevenBlack Adult    │  ~15k      │  Adult/pornographic content │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
